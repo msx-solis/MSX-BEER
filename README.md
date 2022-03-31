@@ -1,12 +1,14 @@
 # MSX-BEER
 New design files for this MSX HD cartridge.
+
 MSXmakers version 1.1 on "beer_ide_kicad" and "gerber" folders.
 
-
 More info:
-Links for ide-beer202
+
+Links for ide-beer202:
+
 Here you have very good instructions (in portuguesse). Talk about the problems with some 82c55 versions and how to format with "SD fortater".
-(Full overWrite y size adjustament = on)
+(Full overWrite y size adjustament = on).
 
 http://basshp.blogspot.com/2014/04/beer-202-ata-ide-review.html
 
