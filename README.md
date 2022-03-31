@@ -1,5 +1,5 @@
 # MSX-BEER
-New design files for this MSX HD cartridge.
+The MSX-Beer202 is a simple IDE interface for the MSX computers that not require to have more than 64K to use a hard disk. Original design by Solid and improved by some others (Yeti, FabF,...) in their own versions.
 
 MSXmakers version 1.1 on "beer_ide_kicad" and "gerber" folders.
 
