@@ -1,0 +1,9527 @@
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;››                                                                          ››
+;››      Hard Disk ROM for MSX computer (connect IDE HDD)                    ››
+;››      made for IDE card BEER-202                                          ››
+;››                                                                          ››
+;››      (c) 1984 MicroSoft (Disk Basic version 1.0)                         ››
+;››      (c) 1993 SOLIDSOFT (version 1.0)                                    ››
+;››      (c) 1995 SOLIDSOFT (version 1.7)                                    ››
+;››      (c) 1995 SOLIDSOFT (version 1.8)                                    ››
+;››                                                                          ››
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;
+;
+;	Compile:
+;		as hddrom
+;		ld hddrom=hddrom
+;
+	.Z80
+
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	ROM header
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+	.phase	4000h
+;
+	db	'AB'
+	dw	HDD_ROM_Startup
+	dw	BasicCallHandler
+	dw	0
+	dw	0
+	dw	0
+	dw	0
+	dw	0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	STANDARD DISK BIOS
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+	jp	HDD_SectorIO		;4010
+	jp	HDD_DiskChg		;4013
+	jp	HDD_SetBPB		;4016
+	jp	HDD_Choice		;4019
+	jp	HDD_Format		;401C
+	jp	HDD_StopMotor		;401F
+	jp	HDD_RunDiskBasic	;4021
+	scf
+	jp	HDD_CondFormat		;4024
+	jp	StopAll			;4025
+	db	0
+	jp	GetMySlot		
+	ld	hl,(0F34Bh)
+	ret
+
+;›››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;
+;	The area beneath may not be changed, or must be shanged
+;	very carefully not to affect standard entry points into Disk Driver
+;
+;	All subroutines having names of BDOS_XX type are standard
+;	entries for DOS-1 functions.
+;
+;›››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Keyboard driver
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SenseCtrlC:
+	push	ix
+	ld	ix,0B7h
+	call	BIOS_Call
+	pop	ix
+	jr	nc,.10
+	ld	a,3
+	ld	(0F336h),a
+	ld	(0F337h),a
+	and	a
+	ret
+;
+.10:	ld	a,(0F336h)
+	and	a
+	ld	a,(0F337h)
+	ret	nz
+	push	ix
+	ld	ix,9Ch
+	call	BIOS_Call
+	pop	ix
+	ret	z
+	ld	a,0FFh
+	ld	(0F336h),a
+	push	ix
+	ld	ix,9Fh
+	call	BIOS_Call
+	pop	ix
+	ld	(0F337h),a
+	push	bc
+	ld	b,0
+	inc	b
+	pop	bc
+	ret
+
+
+
+CharAvail:
+	push	hl
+	ld	hl,0F336h
+	xor	a
+	cp	(hl)
+	ld	(hl),a
+	inc	hl
+	ld	a,(hl)
+	pop	hl
+	ret	nz
+	push	ix
+	ld	ix,9Fh
+	call	BIOS_Call
+	pop	ix
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+PutChar:push	ix
+	ld	ix,0A2h
+	call	BIOS_Call
+	pop	ix
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+PrintChar:
+	push	ix
+	ld	ix,0A5h
+	call	BIOS_Call
+	pop	ix
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GotoBasic:
+	ld	ix,409Bh
+BIOS_Call:
+	push	iy
+	ld	iy,(0FCC0h)
+	call	1Ch
+	ei
+	pop	iy
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+TestClock:
+	ld	a,0Dh
+	out	(0B4h),a
+	ld	a,0Ah
+	out	(0B5h),a
+	xor	a
+	out	(0B4h),a
+	ld	b,0Fh
+.11:	in	a,(0B5h)
+	and	0Fh
+	xor	b
+	out	(0B5h),a
+	ld	c,a
+	nop
+	in	a,(0B5h)
+	and	0Fh
+	cp	c
+	ret	nz
+	xor	b
+	out	(0B5h),a
+	djnz	.11
+	ld	a,0FFh
+	ld	(0F338h),a
+	ld	a,0Dh
+	out	(0B4h),a
+	ld	a,9
+	out	(0B5h),a
+	ld	a,0Ah
+	out	(0B4h),a
+	ld	a,1
+	out	(0B5h),a
+	ld	a,0Dh
+	out	(0B4h),a
+	xor	a
+	out	(0B5h),a
+	ld	bc,0D00h
+.12:	ld	a,c
+	out	(0B4h),a
+	in	a,(0B5h)
+	push	af
+	inc	c
+	djnz	.12
+	ld	a,0Eh
+	out	(0B4h),a
+	xor	a
+	out	(0B5h),a
+	ld	b,0Dh
+.13:	dec	c
+	ld	a,c
+	out	(0B4h),a
+	pop	af
+	out	(0B5h),a
+	djnz	.13
+	jr	StartClock
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4115:	ld	(0F33Bh),hl
+	ld	a,(0F338h)
+	and	a
+	ret	z
+	ld	a,(0F24Ah)
+	ld	b,a
+	ld	a,(0F249h)
+	ld	c,a
+	ld	a,(0F248h)
+	ld	d,a
+	ld	e,7
+	call	StopClock
+	jr	.15
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetCurDate:
+	ld	a,(0F338h)
+	and	a
+	ret	z
+	ld	e,0
+	call	StopClock
+	ld	a,0Fh
+	out	(0B4h),a
+	ld	a,2
+	out	(0B5h),a
+.15:	ld	h,d
+	call	WrClockB
+	ld	h,c
+	call	WrClockB
+	ld	h,b
+	call	WrClockB
+StartClock:
+	ld	a,0Dh
+	out	(0B4h),a
+	in	a,(0B5h)
+	or	8
+.18:
+	out	(0B5h),a
+	ret
+StopClock:
+	call	StartClock
+	and	4
+	jr	.18
+WrClockB:
+	xor	a
+	ld	l,8
+.17:
+	rlc	h
+	adc	a,a
+	daa
+	dec	l
+	jr	nz,.17
+	call	NextClocAdr
+	rrca
+	rrca
+	rrca
+	rrca
+NextClocAdr:
+	push	af
+	ld	a,e
+	inc	e
+	out	(0B4h),a
+	pop	af
+	jr	.18
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetClockDate:
+	ld	a,(0F338h)
+	and	a
+	ld	b,a
+	ld	c,a
+	ld	d,a
+	ld	e,a
+	ld	hl,(0F33Bh)
+	ret	z
+	call	StopClock
+	ld	e,0Dh
+	call	RdClockB
+	call	SetFebDays
+	call	RdClockB
+	ld	(0F249h),a
+	call	RdClockB
+	ld	(0F248h),a
+	dec	e
+	call	RdClockB
+	ld	b,a
+	call	RdClockB
+	ld	c,a
+	call	RdClockB
+	call	StartClock
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+RdClockB:
+	xor	a
+	call	RdClock
+	add	a,a
+	add	a,a
+	add	a,d
+	add	a,a
+RdClock:
+	ld	d,a
+	dec	e
+	ld	a,e
+	out	(0B4h),a
+	in	a,(0B5h)
+	and	0Fh
+	add	a,d
+	ld	d,a
+	ret
+;
+	db	'IDE HDD Driver ver 1.80 (C) 1995 by SOLIDSOFT '
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	DOS function -- get version
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0C:ld	b,0
+	ld	a,22h
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get FAT entry
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GETFAT:	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	jp	NewGetFAT
+OldGetFAT:
+	push	de
+	ld	e,l
+	ld	d,h
+	srl	h
+	rr	l
+	rra
+	add	hl,de
+	pop	de
+	add	hl,de
+	rla
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	jr	nc,.29
+	srl	h
+	rra
+	srl	h
+	rra
+	srl	h
+	rra
+	srl	h
+	rra
+.29:	ld	l,a
+	ld	a,h
+	and	0Fh
+	ld	h,a
+	or	l
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+PutFAT:	push	de
+	ld	e,l
+	ld	d,h
+	srl	h
+	rr	l
+	rra
+	add	hl,de
+	pop	de
+	add	hl,de
+	rla
+	jr	nc,.20
+	sla	c
+	rl	b
+	sla	c
+	rl	b
+	sla	c
+	rl	b
+	sla	c
+	rl	b
+	ld	a,(hl)
+	and	0Fh
+	or	c
+	ld	(hl),a
+	inc	hl
+	ld	(hl),b
+	ret
+;
+.20:	ld	(hl),c
+	inc	hl
+	ld	a,(hl)
+	and	0F0h
+	or	b
+	ld	(hl),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Compare character strings
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CompFCB:ld	de,0F2B9h
+CompStr:ld	a,(de)
+	cp	(hl)
+	inc	hl
+	inc	de
+	ret	nz
+	djnz	CompStr
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;    Check if file name is a device
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CheckDevs:
+	call	0F255h
+	ld	hl,0F1F7h
+	ld	c,5
+.34:	ld	b,4
+	call	CompFCB
+	jr	nz,.31
+	ld	b,4
+.33:	ld	a,(de)
+	inc	de
+	cp	' '
+	jr	nz,.32
+	djnz	.33
+	ld	a,c
+	neg
+	ld	(0F216h),a
+	ld	hl,0F2B9h
+	ld	de,0F20Bh
+	ld	bc,4
+	ldir
+	call	ConvDate
+	ld	(0F223h),bc
+	ld	(0F221h),de
+	ld	hl,0F20Bh
+	push	hl
+	pop	iy
+	or	1
+	ret
+;
+.31:	dec	b
+	ld	a,l
+	add	a,b
+	ld	l,a
+	ld	a,h
+	adc	a,0
+	ld	h,a
+	dec	c
+	jr	nz,.34
+.32:	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Directory search (1st time)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Dir1st:	push	de
+	ld	hl,0Eh
+	add	hl,de
+	ld	(hl),0
+	call	Dsearch
+	pop	de
+	ret
+;
+Dsearch:
+	call	CheckFCB
+	ret	c
+Search1st:
+	call	CheckDevs
+	ret	nc
+	call	DskChgCheck
+DirSearch:
+	call	0F258h
+	call	DirGet
+	ret	c
+.40:	ld	a,(hl)
+	or	a
+	jr	z,.35
+	cp	0E5h
+	jr	z,.35
+	push	hl
+	ld	b,0Bh
+	ld	de,0F2B9h
+.38:	call	CompStr
+	jr	z,.36
+	cp	'?'
+	jr	nz,.37
+	djnz	.38
+.36:	pop	hl
+	push	hl
+	pop	iy
+	ld	a,(0F2C4h)
+	xor	80h
+	bit	7,a
+	ret	z
+	ld	a,(iy+0Bh)
+	and	1Eh
+	ret	z
+	ld	a,(0F2DCh)
+	or	a
+	ret	nz
+	jr	.39
+;
+.37:	pop	hl
+.39:	call	NextDirEntry
+	jr	nc,.40
+	ret
+;
+.35:	ld	a,(0F2FEh)
+	inc	a
+	jr	nz,.41
+	ld	a,(0F2B8h)
+	ld	(0F2FEh),a
+.41:	ld	a,(hl)
+	or	a
+	jr	nz,.39
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DirGet:	ld	a,(0F2B8h)
+	inc	a
+	cp	(ix+0Bh)
+	jr	nc,.42
+GetDirectoryItem:
+	call	0F25Bh
+	ld	(0F2B8h),a
+	ld	c,a
+	and	(ix+4)
+	ld	l,a
+	ld	h,0
+	add	hl,hl
+	add	hl,hl
+	add	hl,hl
+	add	hl,hl
+	add	hl,hl
+	ld	de,(0F351h)
+	add	hl,de
+	ld	b,(ix+5)
+.43:	srl	c
+	djnz	.43
+	ld	a,(0F245h)
+	cp	c
+	jr	nz,.44
+	ld	a,(0F246h)
+	cp	(ix)
+	ret	z
+.44:	push	hl
+	call	DirWriteRead
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+NextDirEntry:
+	call	0F25Eh
+	ld	a,(0F2B8h)
+	inc	a
+	cp	(ix+0Bh)
+	jr	nc,.42
+	ld	(0F2B8h),a
+	ld	de,20h
+	add	hl,de
+	and	(ix+4)
+	ret	nz
+	inc	c
+	call	DirWriteRead
+	ld	hl,(0F351h)
+	ret
+;
+.42:	call	WriteDirChg
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- delete file(s)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_13:call	CheckFCB
+	call	nc,Search1st
+	ld	a,0FFh
+	ret	c
+	ret	nz
+.45:	ld	a,0E5h
+	ld	(0F23Ch),a
+	ld	(hl),a
+	ld	l,(iy+1Ah)
+	ld	h,(iy+1Bh)
+	ld	a,h
+	or	l
+	call	nz,KillFatChain
+	call	DirSearch
+	jr	nc,.45
+	call	DirWriteOK
+	jp	CloseFatUpdate
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- rename file(s)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_17:call	CheckFCB
+	jr	c,RetErrorFF
+	ld	de,5
+	add	hl,de
+	ld	de,0F2C5h
+	call	0F1F4h
+	call	nc,Search1st
+	jr	c,RetErrorFF
+	jr	nz,RetErrorFF
+	ld	hl,0F2B9h
+	ld	de,0F2D0h
+	ld	bc,0Ch
+	ldir
+.51:	ld	hl,0F2C5h
+	ld	de,0F2B9h
+	ld	b,0Bh
+.49:	ld	a,(hl)
+	cp	'?'
+	jr	nz,.48
+	ld	a,(iy)
+.48:	ld	(de),a
+	inc	hl
+	inc	de
+	inc	iy
+	djnz	.49
+	ld	a,80h
+	ld	(de),a
+	call	CheckDevs
+	jr	nc,DirWriteER
+	ld	a,(0F2B8h)
+	push	af
+	ld	a,0FFh
+	ld	(0F2B8h),a
+	call	DirSearch
+	pop	bc
+	jr	nc,DirWriteER
+	ld	a,b
+	call	GetDirectoryItem
+	ex	de,hl
+	ld	hl,0F2B9h
+	ld	bc,0Bh
+	ldir
+	ld	a,0FFh
+	ld	(0F23Ch),a
+	ld	hl,0F2D0h
+	ld	de,0F2B9h
+	ld	bc,0Ch
+	ldir
+	call	DirSearch
+	jr	nc,.51
+DirWriteOK:
+	call	WriteDirChg
+	xor	a
+	ret
+DirWriteER:
+	call	WriteDirChg
+RetErrorFF:
+	ld	a,0FFh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Check FCB for correct name
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CheckFCB:
+	call	0F261h
+	xor	a
+	ld	(0F2DCh),a
+	ex	de,hl
+	ld	a,(hl)
+	inc	hl
+	ld	(0F2C4h),a
+	and	0Fh
+	call	SetWorkDisk
+	ret	c
+	ld	de,0F2B9h
+	jp	0F1F4h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	FCB's disk field processing
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetWorkDisk:
+	ld	c,a
+	ld	a,(0F347h)
+	cp	c
+	ret	c
+	ld	a,c
+	dec	a
+	jp	p,.52
+	ld	a,(0F247h)
+.52:	ld	(0F2E1h),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Check file size for OPEN
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CheckSizes:
+	ld	a,(iy+1Fh)
+	or	a
+	jr	nz,.53
+	ld	a,(iy+1Ch)
+	ld	c,(iy+1Dh)
+	ld	b,(iy+1Eh)
+	add	a,a
+	rl	c
+	rl	b
+	jr	c,.53
+	or	a
+	jr	z,.54
+	inc	bc
+	ld	a,b
+	or	c
+	jr	z,.53
+.54:	ld	a,c
+	res	7,c
+	add	a,a
+	rl	b
+	ret	nc
+.53:	ld	bc,0FF7Fh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- open file
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0F:call	Dir1st
+	jr	c,RetErrorFF
+	call	CheckSizes
+	ld	a,(0F30Ch)
+	inc	b
+	cp	b
+	jr	nc,RetErrorFF
+.72:	call	0F264h
+	ex	de,hl
+	ld	bc,0Fh
+	add	hl,bc
+	call	CheckSizes
+	ld	a,(0F30Ch)
+	cp	b
+	jr	z,.55
+	ld	c,80h
+	jr	c,.55
+	ld	c,0
+.55:	ld	(hl),c
+	inc	hl
+	ex	de,hl
+	ld	bc,1Ch
+	add	hl,bc
+	ld	c,4
+	ldir
+	ld	bc,0FFF8h
+	add	hl,bc
+	ldi
+	ldi
+	ld	c,0FCh
+	add	hl,bc
+	ldi
+	ldi
+	ld	a,(iy+0Bh)
+	bit	7,a
+	jr	nz,.56
+	ld	a,(ix)
+	or	'@'
+.56:	ld	(de),a
+	inc	de
+	ld	a,(0F2B8h)
+	ld	(de),a
+	inc	de
+	ld	a,(iy+1Ah)
+	ld	(de),a
+	inc	de
+	inc	de
+	ld	(de),a
+	dec	de
+	ld	a,(iy+1Bh)
+	ld	(de),a
+	inc	de
+	inc	de
+	ld	(de),a
+	inc	de
+	xor	a
+	ld	(de),a
+	inc	de
+	ld	(de),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Disk error while DiskChange
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+@error:	ld	c,a
+	ld	a,(0F2E1h)
+	call	CallErrorSub
+	jr	DoDiskChange
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Check for disk change
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DskChgCheck:
+	ld	a,0FFh
+	ld	(0F2B8h),a
+	ld	(0F2FEh),a
+DoDiskChange:
+	call	0F267h
+	call	DpbAdr
+	ld	a,(0F2E1h)
+	ld	c,(ix+1)
+	ld	b,0
+	or	a
+	call	DiskChg_all
+	jr	c,@error
+	call	SetDPBAdr
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	dec	hl
+	ld	a,b
+	or	(hl)
+	ld	a,(0F2E1h)
+	ld	hl,(0F241h)
+	jp	m,.59
+	ret	nz
+	cp	l
+	jr	nz,.60
+	dec	h
+	ret	z
+.59:	sub	l
+	jr	nz,.60
+	ld	l,a
+	ld	h,a
+	dec	l
+	ld	(0F241h),hl
+.60:	ld	a,0FFh
+	ld	(0F246h),a
+	jp	.61
+;
+	ds	0Bh		;** SOLID: patch for correct addresses
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Correct DPB table
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DPB_change_entry:
+	ld	b,(hl)
+	ld	a,(0F2E1h)
+	ld	c,(ix+1)
+	push	ix
+	pop	hl
+	call	SetDPB_all
+SetDPBAdr:
+	push	hl
+	pop	ix
+	ex	de,hl
+	call	GetDPB
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ret
+;
+	ds	15h		;** SOLID: Patch for addresses
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	IX -> DPB for drive
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DpbAdr:	call	0F26Ah
+	call	GetDPB
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	push	hl
+	pop	ix
+	ret
+;
+GetDPB:	ld	a,(0F2E1h)
+GetDPBptr:
+	ld	hl,0F355h
+	add	a,a
+	add	a,l
+	ld	l,a
+	ret	nc
+	inc	h
+	ret
+;
+	ds	2
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- close file
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_10:push	de
+	pop	iy
+	call	CheckFCB
+	ld	a,0FFh
+	ret	c
+	ld	a,(iy+18h)
+	and	0C0h
+	ld	a,0
+	ret	nz
+	ld	a,(0F2E1h)
+	ld	hl,(0F241h)
+	cp	l
+	call	z,WriteChangedSect
+	call	DpbAdr
+	ld	a,(iy+19h)
+	call	GetDirectoryItem
+	ld	b,0Bh
+	call	CompFCB
+	jr	nz,ResFATchanges
+	push	iy
+	pop	de
+	ld	c,0Bh
+	add	hl,bc
+	ex	de,hl
+	ld	c,16h
+	add	hl,bc
+	ldi
+	ldi
+	ld	bc,0FFFCh
+	add	hl,bc
+	ldi
+	ldi
+	ld	bc,4
+	add	hl,bc
+	ldi
+	ldi
+	ld	bc,0FFF4h
+	add	hl,bc
+	ld	bc,4
+	ldir
+	call	WriteDir
+DoUpdateFAT:
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	dec	hl
+	ld	a,(hl)
+	cp	1
+	ret	nz
+CloseFatUpdate:
+	call	0F26Dh
+	call	NewUpdateFAT
+	xor	a
+	ret
+;
+	ds	17h		;** SOLID: patch
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Reset file change flag
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ResFATchanges:
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	dec	hl
+	ld	(hl),0
+	ld	a,0FFh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get FAT buffer parameters
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetFATbuf:
+	ld	a,(ix+0Ah)
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	ld	b,(ix+10h)
+	ld	e,(ix+8)
+	ld	d,(ix+9)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get directory buffer parms
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetDirectParams:
+	add	a,(ix+11h)
+	ld	e,a
+	ld	d,(ix+12h)
+	jr	nc,.63
+	inc	d
+.63:	ld	hl,(0F351h)
+	ld	b,1
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- create file
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_16:push	de
+	call	CheckFCB
+	jr	c,.64
+	inc	hl
+	inc	hl
+	ld	(hl),0
+	ld	hl,0F2B9h
+	ld	a,'?'
+	ld	bc,0Bh
+	cpir
+	jr	z,.64
+	call	Search1st
+	jr	nc,.65
+	ld	a,(0F2FEh)
+	cp	0FFh
+	jr	z,.64
+	call	GetDirectoryItem
+	push	hl
+	pop	iy
+	jr	.66
+;
+.68:	bit	7,(iy+0Bh)
+	jr	nz,.67
+.64:	pop	de
+	ld	a,0FFh
+	ret
+;
+.65:	jr	nz,.68
+	ld	a,(0F30Ch)
+	or	a
+	jr	nz,.67
+	ld	l,(iy+1Ah)
+	ld	h,(iy+1Bh)
+	ld	a,h
+	or	l
+	jr	z,.66
+	call	KillFatChain
+	call	CloseFatUpdate
+.66:	push	iy
+	pop	de
+	ld	hl,0F2B9h
+	ld	bc,0Bh
+	ldir
+	ld	a,(hl)
+	rla
+	ld	a,0
+	jr	nc,.69
+	ld	a,6
+.69:	ld	(de),a
+	inc	de
+	ex	de,hl
+	ld	b,0Ah
+	xor	a
+.70:	ld	(hl),a
+	inc	hl
+	djnz	.70
+	push	hl
+	call	ConvDate
+	pop	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	inc	hl
+	ld	(hl),c
+	inc	hl
+	ld	(hl),b
+	inc	hl
+	xor	a
+	ld	b,6
+.71:	ld	(hl),a
+	inc	hl
+	djnz	.71
+	call	WriteDir
+.67:	push	iy
+	pop	hl
+	pop	de
+	jp	.72
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Change DIR sector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DirWriteRead:
+	push	bc
+	call	WriteDirChg
+	pop	bc
+	ld	b,(ix)
+	ld	(0F245h),bc
+	push	bc
+	ld	a,c
+	call	GetDirectParams
+	call	DOS_abs_read
+	pop	bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- read sector(s)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2F:ld	b,h
+	ld	a,l
+	ld	(0F2E1h),a
+	call	DpbAdr
+	ld	hl,(0F23Dh)
+DOS_abs_read:
+	call	0F270h
+	xor	a
+	ld	(0F2FFh),a
+	call	rdSector
+	ret	nc
+	call	ErrorProc
+	dec	a
+	jr	z,DOS_abs_read
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	read sector with DPB
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+rdSector:
+	ld	a,(ix)
+	ld	c,(ix+1)
+	push	hl
+	push	de
+	push	bc
+	call	ReadSector_all
+	pop	de
+	ld	c,d
+	pop	de
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Disk error processing
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ErrorProc:
+	push	af
+	ld	a,c
+	sub	b
+	ld	c,a
+	push	bc
+	ld	b,0
+	ex	de,hl
+	add	hl,bc
+	push	hl
+	push	de
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	call	Mul_DE_BC
+	pop	hl
+	pop	de
+	add	hl,bc
+	pop	bc
+	pop	af
+	ld	c,a
+	ld	a,(0F2FFh)
+	or	c
+	ld	c,a
+	ld	a,(ix)
+CallErrorSub:
+	call	0F273h
+	push	bc
+	push	de
+	push	hl
+	ld	hl,(0F323h)
+	call	0F1E8h
+	ld	a,c
+	pop	hl
+	pop	de
+	pop	bc
+	cp	2
+	ret	nz
+	jp	0F1E2h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- write sector(s)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_30:ld	b,h
+	ld	a,l
+	ld	(0F2E1h),a
+	call	DpbAdr
+	ld	hl,(0F23Dh)
+	jr	DOS_Abs_write
+WriteChangedSect:
+	ld	hl,0F242h
+	xor	a
+	cp	(hl)
+	ld	(hl),a
+	ret	z
+	ld	ix,(0F243h)
+	ld	hl,(0F34Fh)
+	ld	b,1
+	ld	de,(0F23Fh)
+	jr	DOS_Abs_write
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Write dir buffer if changed
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+WriteDirChg:
+	ld	a,(0F23Ch)
+	or	a
+	ret	z
+WriteDir:
+	call	0F276h
+	xor	a
+	ld	(0F23Ch),a
+	ld	a,(0F245h)
+	call	GetDirectParams
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Write sector (use DPB)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DOS_Abs_write:
+	call	0F279h
+	ld	a,1
+	ld	(0F2FFh),a
+	ld	a,(ix)
+	ld	c,(ix+1)
+	push	hl
+	push	de
+	push	bc
+	call	WriteSector_all
+	pop	de
+	ld	c,d
+	pop	de
+	pop	hl
+	ret	nc
+	call	ErrorProc
+	dec	a
+	jr	z,DOS_Abs_write
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- CPM read
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_14:call	CPM2DOS
+	call	ReadRec
+	jr	_stepout
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- CPM write
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_15:call	CPM2DOS
+	call	WriteRec
+_stepout:
+	call	IncRecNo
+	jr	SetCPM_RecNo
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS --	CPM random I/O
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_21:call	GetOffsetNR1
+	call	ReadRec
+	jr	BlockIO_end
+;
+BlockIO_handler:
+	push	iy
+	pop	de
+BDOS_22:
+	call	GetOffsetNR1
+	call	WriteRec
+BlockIO_end:
+	call	SetRecOffset
+SetCPM_RecNo:
+	ld	a,l
+	and	7Fh
+	ld	(iy+20h),a
+	sla	l
+	rl	h
+	ld	(iy+0Ch),h
+	rl	e
+	ld	(iy+0Eh),e
+	ld	a,(0F2DEh)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- DOS block read
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_27:xor	a
+	ld	(0F306h),a
+	call	GetRecOffset
+	call	ReadRec
+	jr	IncBlocks
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- DOS block write
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_26:xor	a
+	ld	(0F306h),a
+	call	GetRecOffset
+	call	WriteRec
+IncBlocks:
+	call	IncRecNo
+	call	SetRecOffset
+	ld	l,c
+	ld	h,b
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- write w/zero fill
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_28:push	de
+	pop	iy
+	ld	a,(iy+10h)
+	ld	c,(iy+11h)
+	ld	b,(iy+12h)
+	ld	e,(iy+13h)
+	add	a,a
+	rl	c
+	rl	b
+	rl	e
+	or	a
+	jr	z,.80
+	inc	bc
+	ld	a,b
+	or	c
+	jr	nz,.80
+	inc	e
+.80:	ld	l,(iy+21h)
+	ld	h,(iy+22h)
+	sbc	hl,bc
+	jr	z,BlockIO_handler
+	ld	a,(iy+23h)
+	sbc	a,e
+	jr	c,BlockIO_handler
+	push	hl
+	call	BlockIO_handler
+	pop	de
+	or	a
+	ret	nz
+	ld	hl,(0F23Dh)
+	push	hl
+	ld	hl,(0F351h)
+	ld	(0F23Dh),hl
+	ld	b,80h
+.82:	ld	(hl),a
+	inc	hl
+	djnz	.82
+	dec	a
+	ld	(0F246h),a
+	ld	l,(iy+21h)
+	ld	h,(iy+22h)
+	sbc	hl,de
+	ld	c,l
+	ld	b,h
+	ex	de,hl
+	ld	d,0
+	ld	a,(iy+23h)
+	sbc	a,d
+	ld	e,a
+.83:	push	hl
+	ld	hl,1
+	call	WriteRec
+	call	IncRecNo
+	ld	c,l
+	ld	b,h
+	pop	hl
+	dec	hl
+	ld	a,h
+	or	l
+	jr	nz,.83
+	pop	hl
+	ld	(0F23Dh),hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	put file offset to FCB
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetRecOffset:
+	ld	a,(0F2DEh)
+	ld	(iy+21h),l
+	ld	(iy+22h),h
+	ld	(iy+23h),e
+	inc	d
+	dec	d
+	ret	z
+	ld	(iy+24h),d
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	get offset from FCB
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetOffsetNR1:
+	ld	hl,1
+GetRecOffset:
+	push	de
+	pop	iy
+	ld	c,(iy+21h)
+	ld	b,(iy+22h)
+	ld	e,(iy+23h)
+	ld	d,(iy+24h)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Next record (inc LONG)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+IncRecNo:
+	ret	z
+	inc	hl
+	ld	a,h
+	or	l
+	ret	nz
+	inc	de
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Block I/O error return
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+blioEr:	pop	hl
+	ld	l,c
+	ld	h,b
+	ld	a,1
+	ld	(0F2DEh),a
+	xor	a
+	ld	c,a
+	ld	b,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S487D:	ld	(0F2E8h),hl
+	ld	(0F2E4h),bc
+	ld	(0F2E6h),de
+	ld	a,(iy)
+	call	SetWorkDisk
+	jr	c,blioEr
+	ld	de,80h
+	ld	a,(0F306h)
+	or	a
+	jr	nz,.85
+	ld	a,(iy+0Eh)
+	ld	d,(iy+0Fh)
+	ld	e,a
+	or	d
+	jr	nz,.85
+	ld	e,80h
+	ld	(iy+0Eh),e
+.85:	inc	d
+	dec	d
+	jr	nz,.86
+	ld	a,e
+	cp	40h
+	jr	c,.87
+.86:	xor	a
+	ld	(0F2E7h),a
+.87:	ld	hl,(0F23Dh)
+	ld	(0F2E2h),hl
+	xor	a
+	ld	(0F2DEh),a
+	ld	(0F2DFh),a
+	ld	bc,(0F2E8h)
+	call	Mul_DE_BC
+	ld	a,(iy+18h)
+	or	a
+	ret	m
+	push	bc
+	call	DpbAdr
+	ld	bc,(0F2E4h)
+	call	Mul_DE_BC
+	ld	(0F2F4h),bc
+	push	bc
+	ld	bc,(0F2E6h)
+	call	Mul32
+	ld	(0F2F6h),bc
+	ld	h,b
+	ld	l,c
+	pop	bc
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	call	DIV_HLBC_DE
+	ld	(0F2F2h),hl
+	ld	(0F2EEh),bc
+	ld	a,(ix+6)
+	and	c
+	ld	(0F2DDh),a
+	ld	a,(ix+7)
+.89:	dec	a
+	jr	z,.88
+	srl	b
+	rr	c
+	jr	.89
+;
+.88:	ld	(0F2ECh),bc
+	pop	bc
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Multiply & Divide
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Mul_DE_BC:
+	call	0F27Ch
+	ld	hl,0
+Mul32:	ld	a,b
+	ld	b,11h
+	jr	.90
+;
+.92:	jr	nc,.91
+	add	hl,de
+.91:	rr	h
+	rr	l
+.90:	rra
+	rr	c
+	djnz	.92
+	ld	b,a
+	ret
+;
+DIV_BC_DE:
+	ld	hl,0
+DIV_HLBC_DE:
+	call	0F27Fh
+	ld	a,b
+	ld	b,10h
+	rl	c
+	rla
+.95:	rl	l
+	rl	h
+	jr	c,.93
+	sbc	hl,de
+	jr	nc,.94
+	add	hl,de
+.94:	ccf
+.96:	rl	c
+	rla
+	djnz	.95
+	ld	b,a
+	ret
+;
+.93:	or	a
+	sbc	hl,de
+	jr	.96
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4953:	ld	h,b
+	ld	l,c
+	ld	bc,(0F2F2h)
+	ld	a,b
+	or	c
+	ld	e,a
+	ld	d,a
+	jr	z,.97
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	ex	de,hl
+	sbc	hl,bc
+	ex	de,hl
+	sbc	hl,de
+	jr	nc,.97
+	add	hl,de
+	ex	de,hl
+	ld	hl,0
+.97:	ld	(0F2F8h),de
+	ld	c,l
+	ld	b,h
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	call	DIV_BC_DE
+	ld	(0F2FAh),hl
+	ld	(0F2FCh),bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4989:	call	0F282h
+	ld	l,(iy+1Ch)
+	ld	h,(iy+1Dh)
+	ld	e,(iy+1Eh)
+	ld	d,(iy+1Fh)
+	ld	a,l
+	or	h
+	jr	z,.98
+	push	bc
+	ld	a,c
+	sub	e
+	ld	c,a
+	ld	a,b
+	sbc	a,d
+	ld	b,a
+	jr	nc,.99
+	pop	bc
+	ld	de,0
+	ld	l,(iy+1Ah)
+	ld	h,(iy+1Bh)
+	push	af
+.99:	pop	af
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S49B1:	call	0F285h
+	ld	a,b
+	or	c
+	ret	z
+	push	de
+	push	hl
+	call	GETFAT
+	pop	de
+	ld	a,h
+	cp	0Fh
+	jr	c,.100
+	ld	a,l
+	cp	0F8h
+	jr	nc,.101
+.100:	pop	de
+	inc	de
+	dec	bc
+	jr	S49B1
+;
+.101:	ex	de,hl
+	pop	de
+	ret
+;
+.98:	inc	bc
+	dec	de
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S49D2:	ld	(0F2E0h),a
+	ld	hl,(0F2ECh)
+	ld	a,(0F2DDh)
+	call	CluSec
+	ex	de,hl
+	ld	hl,(0F23Fh)
+	sbc	hl,de
+	jr	nz,.103
+	ld	a,(0F2E1h)
+	ld	l,a
+	ld	a,(0F241h)
+	cp	l
+	jr	z,.104
+.103:	push	de
+	push	ix
+	call	WriteChangedSect
+	pop	ix
+	pop	de
+	ld	a,(0F2E0h)
+	or	a
+	jr	nz,.105
+	dec	a
+	ld	(0F241h),a
+	ld	hl,(0F34Fh)
+	ld	b,1
+	push	de
+	call	DOS_abs_read
+	pop	de
+.105:	ld	(0F23Fh),de
+	ld	a,(0F2E1h)
+	ld	(0F241h),a
+	ld	(0F243h),ix
+.104:	ld	a,1
+	ld	(0F2DFh),a
+	ld	hl,(0F2E2h)
+	push	hl
+	ld	bc,(0F2F8h)
+	add	hl,bc
+	ld	(0F2E2h),hl
+	ld	hl,(0F34Fh)
+	ld	de,(0F2F2h)
+	add	hl,de
+	pop	de
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4A36:	call	0F288h
+	ld	hl,(0F2F8h)
+	ld	a,h
+	or	l
+	ret	z
+	xor	a
+	call	S49D2
+	jp	0F1D9h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4A46:	call	0F28Bh
+	ld	hl,(0F2F8h)
+	ld	a,h
+	or	l
+	ret	z
+	ld	hl,(0F2EEh)
+	inc	hl
+	ld	(0F2EEh),hl
+	xor	a
+	ex	de,hl
+	ld	hl,(0F2F0h)
+	sbc	hl,de
+	rra
+	call	S49D2
+	ex	de,hl
+	call	0F1D9h
+	ld	a,1
+	ld	(0F242h),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4A6B:	ld	hl,0
+	ld	(0F2F2h),hl
+	ld	hl,(0F2FAh)
+	ld	(0F2F8h),hl
+	ld	a,h
+	or	l
+	scf
+	ret	z
+S4A7B:	ld	a,(0F2DFh)
+	or	a
+	ret	z
+	ld	a,(0F2DDh)
+	cp	(ix+6)
+	jr	c,.107
+	ld	de,(0F2ECh)
+	ld	hl,0FF7h
+	sbc	hl,de
+	ret	c
+	ex	de,hl
+	call	GETFAT
+	ld	(0F2ECh),hl
+	ld	hl,(0F2EAh)
+	inc	hl
+	ld	(0F2EAh),hl
+	ld	a,0FFh
+.107:	inc	a
+	ld	(0F2DDh),a
+	or	a
+	ret
+;
+.110:	ld	a,(hl)
+	ldi
+	cp	0Dh
+	jr	nz,.108
+	ld	(hl),0Ah
+.108:	cp	0Ah
+	jr	z,.109
+	ld	a,b
+	or	c
+	jr	nz,.110
+.120:	ld	(0F300h),hl
+.118:	ld	(0F2E2h),de
+	jp	nz,.112
+	res	6,(iy+18h)
+	jp	.112
+;
+.109:	call	Char2CON
+	ld	hl,0
+	ld	a,c
+	or	b
+	jr	nz,.113
+	inc	a
+	jr	.120
+;
+.121:	ld	de,(0F2E2h)
+	inc	a
+	jr	z,.115
+	inc	a
+	jr	nz,.118
+;
+.117:	call	BDOS_3
+	ld	(de),a
+	inc	de
+	cp	1Ah
+	jr	z,.118
+	dec	bc
+	ld	a,b
+	or	c
+	jr	nz,.117
+	inc	a
+	jr	.118
+;
+.115:	ld	hl,(0F300h)
+	ld	a,h
+	or	l
+	jr	nz,.110
+.113:	ld	hl,7Fh
+	ld	a,(0F4D9h)
+	cp	l
+	jr	z,.119
+	ld	(0F4D9h),hl
+.119:	push	bc
+	push	de
+	ld	de,0F4D9h
+	call	BDOS_0A
+	pop	de
+	pop	bc
+	ld	hl,0F4DBh
+	ld	a,(hl)
+	cp	1Ah
+	jr	nz,.110
+	ld	(de),a
+	inc	de
+	ld	a,0Ah
+	call	Char2CON
+	xor	a
+	ld	h,a
+	ld	l,a
+	jr	.120
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	file READ handler
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ReadRec:call	S487D
+	jp	m,.121
+	ld	l,(iy+10h)
+	ld	h,(iy+11h)
+	ld	de,(0F2F4h)
+	or	a
+	sbc	hl,de
+	push	hl
+	ld	l,(iy+12h)
+	ld	h,(iy+13h)
+	ld	de,(0F2F6h)
+	sbc	hl,de
+	pop	hl
+	jp	c,.122
+	jr	nz,.123
+	ld	a,h
+	or	l
+	jp	z,.122
+	push	hl
+	sbc	hl,bc
+	pop	hl
+	jr	nc,.123
+	ld	b,h
+	ld	c,l
+.123:	call	0F28Eh
+	call	S4953
+	ld	bc,(0F2ECh)
+	call	S4989
+	ld	a,b
+	or	c
+	jp	nz,.122
+	ld	(0F2ECh),hl
+	ld	(0F2EAh),de
+	call	S4A36
+	ld	hl,(0F2FCh)
+	ld	a,h
+	or	l
+	jp	z,.124
+	call	S4A7B
+	jr	c,.112
+	ld	a,1
+	ld	(0F2DFh),a
+	ld	a,(0F2DDh)
+	ld	bc,(0F2FCh)
+	ld	hl,(0F2ECh)
+.126:	push	bc
+	call	S4E48
+	push	bc
+	push	af
+	ld	b,a
+	call	DOS_abs_read
+	pop	af
+	ld	c,a
+	ld	b,0
+	jr	c,.125
+	ld	a,(0F242h)
+	or	a
+	jr	z,.125
+	push	bc
+	ld	c,(ix+2)
+	ld	b,(ix+3)
+	push	bc
+	push	hl
+	ld	hl,(0F23Fh)
+	sbc	hl,de
+	ex	de,hl
+	call	Mul_DE_BC
+	pop	hl
+	add	hl,bc
+	pop	bc
+	ex	de,hl
+	ld	hl,(0F34Fh)
+	call	0F1D9h
+	pop	bc
+.125:	pop	de
+	pop	hl
+	or	a
+	sbc	hl,bc
+	jr	z,.124
+	ld	c,l
+	ld	b,h
+	ld	hl,0FF7h
+	sbc	hl,de
+	jr	c,.112
+	ld	hl,(0F2EAh)
+	inc	hl
+	ld	(0F2EAh),hl
+	xor	a
+	ex	de,hl
+	jr	.126
+;
+.124:	call	S4A6B
+	call	nc,S4A36
+.112:	call	0F291h
+	ld	hl,(0F2E2h)
+	ld	de,(0F23Dh)
+	or	a
+	sbc	hl,de
+	ld	c,l
+	ld	b,h
+	ld	de,80h
+	ld	a,(0F306h)
+	or	a
+	jr	nz,.127
+	ld	e,(iy+0Eh)
+	ld	d,(iy+0Fh)
+.127:	call	DIV_BC_DE
+	ld	a,h
+	or	l
+	jr	z,.128
+	inc	bc
+	ex	de,hl
+	sbc	hl,de
+	ld	de,(0F2E2h)
+.129:	xor	a
+	ld	(de),a
+	inc	de
+	dec	hl
+	ld	a,h
+	or	l
+	jr	nz,.129
+.128:	ld	hl,(0F2E8h)
+	sbc	hl,bc
+	jr	z,.151
+	inc	a
+	ld	(0F2DEh),a
+.151:	call	0F294h
+	ld	hl,(0F2ECh)
+	ld	(iy+1Ch),l
+	ld	(iy+1Dh),h
+	ld	hl,(0F2EAh)
+	ld	(iy+1Eh),l
+	ld	(iy+1Fh),h
+.138:	ld	hl,(0F2E4h)
+	ld	de,(0F2E6h)
+	ld	a,b
+	or	c
+	ret	z
+	dec	bc
+	add	hl,bc
+	inc	bc
+	ret	nc
+	inc	de
+	ret
+;
+.139:	ld	hl,(0F23Dh)
+	or	40h
+	inc	a
+	jr	z,.131
+	inc	a
+	jr	z,.132
+	inc	a
+.134:	jr	z,.135
+	ld	a,(hl)
+	inc	hl
+	cp	1Ah
+	jr	z,.135
+	call	Char2PRN
+	dec	bc
+	ld	a,b
+	or	c
+	jr	.134
+;
+.132:	ld	a,(hl)
+	inc	hl
+	call	Char2AUX
+	cp	1Ah
+	jr	z,.135
+	dec	bc
+	ld	a,b
+	or	c
+	jr	nz,.132
+	jr	.135
+;
+.131:	ld	a,(hl)
+	inc	hl
+	cp	1Ah
+	jr	z,.135
+	call	Char2CON
+	dec	bc
+	ld	a,b
+	or	c
+	jr	nz,.131
+.135:	ld	bc,(0F2E8h)
+	jr	.138
+;
+.145:	ld	c,e
+	ld	b,d
+	call	S49B1
+	ld	a,b
+	or	c
+	jp	z,.137
+	call	ResvFATchn
+	jp	nc,.137
+.122:	call	0F297h
+	xor	a
+	ld	c,a
+	ld	b,a
+	inc	a
+	ld	(0F2DEh),a
+	jr	.138
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	file WRITE handler
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+WriteRec:
+	call	S487D
+	push	af
+	push	bc
+	call	ConvDate
+	ld	(iy+14h),c
+	ld	(iy+15h),b
+	ld	(iy+16h),e
+	ld	(iy+17h),d
+	pop	bc
+	pop	af
+	jp	m,.139
+	res	6,(iy+18h)
+	push	bc
+	call	S4953
+	pop	bc
+	ld	hl,(0F2F4h)
+	ld	de,(0F2F6h)
+	ld	a,b
+	or	c
+	jp	z,.140
+	dec	bc
+	add	hl,bc
+	jr	nc,.141
+	inc	de
+.141:	ld	b,h
+	ld	c,l
+	ex	de,hl
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	call	DIV_HLBC_DE
+	ld	h,b
+	ld	l,c
+	ld	b,(ix+7)
+	dec	b
+	jr	z,.142
+.143:	srl	h
+	rr	l
+	djnz	.143
+.142:	push	hl
+	ld	c,(iy+10h)
+	ld	b,(iy+11h)
+	ld	l,(iy+12h)
+	ld	h,(iy+13h)
+	call	DIV_HLBC_DE
+	ld	a,h
+	or	l
+	jr	z,.144
+	inc	bc
+.144:	call	0F29Ah
+	ld	(0F2F0h),bc
+	ld	bc,(0F2ECh)
+	call	S4989
+	ld	(0F2ECh),hl
+	ld	(0F2EAh),de
+	ex	(sp),hl
+	or	a
+	sbc	hl,de
+	ex	de,hl
+	pop	hl
+	jr	z,.137
+	ld	a,b
+	or	c
+	jp	z,.145
+	push	bc
+	ld	c,e
+	ld	b,d
+	call	ResvFATchn
+	pop	bc
+	jp	c,.122
+	ld	de,(0F2EAh)
+	inc	de
+	dec	bc
+	call	S49B1
+	ld	(0F2ECh),hl
+	ld	(0F2EAh),de
+.137:	call	S4A46
+	ld	hl,(0F2FCh)
+	ld	a,h
+	or	l
+	jr	z,.146
+	ld	de,(0F2EEh)
+	add	hl,de
+	ld	(0F2EEh),hl
+	call	S4A7B
+	ld	a,1
+	ld	(0F2DFh),a
+	ld	a,(0F2DDh)
+	ld	hl,(0F2ECh)
+	ld	bc,(0F2FCh)
+.148:	push	bc
+	call	S4E48
+	push	bc
+	push	af
+	ld	b,a
+	jr	c,.147
+	ld	a,0FFh
+	ld	(0F241h),a
+.147:	call	DOS_Abs_write
+	pop	af
+	pop	de
+	pop	hl
+	ld	c,a
+	xor	a
+	ld	b,a
+	sbc	hl,bc
+	jr	z,.146
+	ld	c,l
+	ld	b,h
+	ld	hl,(0F2EAh)
+	inc	hl
+	ld	(0F2EAh),hl
+	ex	de,hl
+	jr	.148
+;
+.146:	call	0F29Dh
+	call	S4A6B
+	call	nc,S4A46
+	ld	hl,(0F2E2h)
+	ld	de,(0F23Dh)
+	or	a
+	sbc	hl,de
+	ld	de,(0F2F4h)
+	add	hl,de
+	ld	de,(0F2F6h)
+	jr	nc,.149
+	inc	de
+.149:	ld	(0F2F4h),hl
+	ld	(0F2F6h),de
+	ld	c,(iy+10h)
+	ld	b,(iy+11h)
+	or	a
+	sbc	hl,bc
+	ld	c,(iy+12h)
+	ld	b,(iy+13h)
+	ex	de,hl
+	sbc	hl,bc
+	jr	c,.150
+.156:	push	iy
+	pop	hl
+	ld	de,10h
+	add	hl,de
+	ex	de,hl
+	ld	hl,0F2F4h
+	ld	bc,4
+	ldir
+.150:	ld	bc,(0F2E8h)
+	jp	.151
+;
+.140:	ld	a,h
+	or	l
+	or	d
+	or	e
+	jr	z,.152
+	ld	bc,1
+	sbc	hl,bc
+	ex	de,hl
+	dec	bc
+	sbc	hl,bc
+	ld	b,d
+	ld	c,e
+	ld	e,(ix+2)
+	ld	d,(ix+3)
+	call	DIV_HLBC_DE
+	ld	a,(ix+7)
+.154:	dec	a
+	jr	z,.153
+	srl	b
+	rr	c
+	jr	.154
+;
+.153:	call	S4989
+	ld	a,b
+	or	c
+	jr	z,.155
+	call	ResvFATchn
+	jp	c,.122
+.157:	ld	bc,0
+	ld	(0F2E8h),bc
+	ld	(0F2EAh),bc
+	ld	l,(iy+1Ah)
+	ld	h,(iy+1Bh)
+	ld	(0F2ECh),hl
+	jr	.156
+;
+.155:	ld	bc,0FFFh
+	call	ResFatChain
+.158:	dec	de
+	ld	a,1
+	ld	(de),a
+	jr	.157
+;
+.152:	ld	l,(iy+1Ah)
+	ld	h,(iy+1Bh)
+	ld	a,h
+	or	l
+	jr	z,.157
+	xor	a
+	ld	(iy+1Ah),a
+	ld	(iy+1Bh),a
+	call	KillFatChain
+	jr	.158
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S4E48:	call	0F2A0h
+	ld	d,a
+	push	hl
+	inc	b
+	dec	b
+	jr	z,.159
+	ld	c,0FFh
+.159:	ld	e,c
+	push	de
+	ld	a,(ix+6)
+	ld	(0F2DDh),a
+	inc	a
+	sub	d
+	ld	b,a
+.162:	ld	(0F2ECh),hl
+	push	hl
+	call	GETFAT
+	pop	de
+	ld	a,c
+	sub	b
+	ld	c,a
+	jr	z,.164
+	ld	b,(ix+6)
+	jr	c,.161
+	inc	b
+	inc	de
+	ex	de,hl
+	sbc	hl,de
+	ex	de,hl
+	jr	z,.162
+.164:	pop	de
+	ex	(sp),hl
+	push	hl
+	push	de
+	ld	a,e
+	sub	c
+	ld	e,a
+	ld	d,0
+	ld	c,(ix+2)
+	ld	b,(ix+3)
+	call	Mul_DE_BC
+	pop	af
+	ld	hl,(0F2E2h)
+	push	hl
+	add	hl,bc
+	ld	(0F2E2h),hl
+	pop	bc
+	pop	hl
+	push	bc
+	push	de
+	ex	de,hl
+	ld	hl,(0F2ECh)
+	sbc	hl,de
+	ld	bc,(0F2EAh)
+	add	hl,bc
+	ld	(0F2EAh),hl
+	ex	de,hl
+	call	CluSec
+	ex	de,hl
+	pop	bc
+	ld	a,(0F241h)
+	cp	(ix)
+	ld	a,c
+	scf
+	jr	nz,.163
+	ld	hl,(0F23Fh)
+	or	a
+	sbc	hl,de
+	jr	c,.163
+	ld	h,b
+	ld	l,c
+	add	hl,de
+	dec	hl
+	ld	bc,(0F23Fh)
+	sbc	hl,bc
+.163:	pop	hl
+	pop	bc
+	ret
+;
+.161:	add	a,b
+	ld	(0F2DDh),a
+	ld	c,0
+	jr	.164
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;    Get 6 bit value for copyright
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Get6b:	call	OldGetFAT
+	ld	a,l
+	add	hl,hl
+	add	hl,hl
+	and	'?'
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Convert cluster to sector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CluSec:	call	0F2A3h
+	push	bc
+	ld	b,(ix+7)
+	dec	hl
+	dec	hl
+	dec	b
+	jr	z,.165
+.166:	sla	l
+	rl	h
+	djnz	.166
+.165:	or	l
+	ld	l,a
+	ld	c,(ix+0Ch)
+	ld	b,(ix+0Dh)
+	add	hl,bc
+	pop	bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;   convert CPM recno to DOS format
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+CPM2DOS:push	de
+	pop	iy
+	ld	c,(iy+20h)
+	ld	b,(iy+0Ch)
+	ld	e,(iy+0Eh)
+	ld	d,0
+	sla	c
+	srl	e
+	rr	b
+	rr	c
+	ld	hl,1
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Reserve FAT chain
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ResvFATchn:
+	call	0F2A6h
+	ld	e,(ix+0Eh)
+	ld	d,(ix+0Fh)
+	ld	(0F302h),de
+	push	hl
+.171:	push	bc
+	push	hl
+	ld	d,h
+	ld	e,l
+.170:	push	de
+	ex	de,hl
+	ld	hl,(0F302h)
+	dec	hl
+	or	a
+	sbc	hl,de
+	ex	de,hl
+	pop	de
+	jr	nc,.167
+	ld	a,e
+	or	d
+	jr	nz,.168
+	pop	hl
+	pop	hl
+	pop	hl
+	ld	bc,0FFFh
+	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	call	FAT_write
+	scf
+	ret
+;
+.167:	inc	hl
+	call	ResvFATentry
+	jp	.170
+;
+.168:	dec	de
+	ex	de,hl
+	call	ResvFATentry
+	ex	de,hl
+	jr	.170
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	reserve single FAT entry
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ResvFATentry:
+	push	hl
+	push	de
+	call	GETFAT
+	pop	de
+	pop	hl
+	ret	nz
+	pop	bc
+	ld	c,l
+	ld	b,h
+	ex	(sp),hl
+	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	call	FAT_write
+	pop	hl
+	pop	bc
+	dec	bc
+	ld	a,b
+	or	c
+	jr	nz,.171
+	ld	bc,0FFFh
+	call	NewPutFAT
+	dec	de
+	ld	a,1
+	ld	(de),a
+	pop	hl
+	push	hl
+	call	FAT_read
+	pop	bc
+	ld	a,c
+	or	b
+	ret	nz
+	ld	(iy+1Ah),l
+	ld	(iy+1Bh),h
+	ret
+;
+	ds	10h		;** SOLID: corrected for multiFAT system
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+KillFatChain:
+	ld	bc,0
+ResFatChain:
+	call	0F2A9h
+	push	hl
+	call	GETFAT
+	ex	(sp),hl
+	call	NewPutFAT
+	pop	hl
+	ld	a,h
+	or	l
+	ret	z
+	ld	a,h
+	cp	0Fh
+	jr	c,KillFatChain
+	ld	a,l
+	cp	0F8h
+	jr	c,KillFatChain
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- search 1st entry
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_11:call	Dir1st
+.176:	jr	c,.172
+	ld	a,(0F2B8h)
+	jr	z,.173
+	ld	a,0FFh
+.173:	ld	(0F30Bh),a
+	ld	(0F309h),ix
+	ld	de,(0F23Dh)
+	ld	a,(0F2E1h)
+	inc	a
+	ld	(de),a
+	inc	de
+	ld	a,(hl)
+	cp	5
+	jr	nz,.174
+	ld	(hl),0E5h
+.174:	ld	bc,20h
+	call	0F1D9h
+	call	CheckSizes
+	ld	a,(0F30Ch)
+	cp	b
+	jr	z,.175
+	jr	nc,.172
+	ld	c,80h
+.175:	ld	hl,(0F23Dh)
+	ld	de,0Ch
+	add	hl,de
+	ld	b,(hl)
+	ld	(hl),a
+	inc	hl
+	ld	(hl),b
+	inc	hl
+	ld	(hl),d
+	inc	hl
+	ld	(hl),c
+	xor	a
+	ret
+;
+.172:	ld	a,0FFh
+	ld	(0F30Bh),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- search next entry
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_12:call	CheckFCB
+	jr	c,.172
+	ld	a,(0F30Bh)
+	cp	0FFh
+	jr	z,.172
+	ld	(0F2B8h),a
+	ld	ix,(0F309h)
+	call	DirSearch
+	jr	.176
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set file length
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_23:call	Dir1st
+	ld	a,0FFh
+	ret	c
+	push	de
+	pop	ix
+	ld	a,(iy+1Ch)
+	ld	c,(iy+1Dh)
+	ld	b,(iy+1Eh)
+	ld	e,(iy+1Fh)
+	add	a,a
+	rl	c
+	rl	b
+	rl	e
+	or	a
+	jr	z,.177
+	inc	bc
+	ld	a,b
+	or	c
+	jr	nz,.177
+	inc	e
+.177:	ld	(ix+21h),c
+	ld	(ix+22h),b
+	ld	(ix+23h),e
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get login vector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_18:
+	ld	a,(0F347h)
+	ld	b,a
+	xor	a
+.178:	scf
+	rla
+	djnz	.178
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set DMA address
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_1A:ld	(0F23Dh),de
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get misc params
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_1B:xor	a
+	ld	(0F306h),a
+	ld	a,e
+	call	SetWorkDisk
+	ld	a,0FFh
+	ret	c
+	call	DoDiskChange
+	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	push	de
+	pop	iy
+	ld	hl,2
+	ld	b,h
+	ld	c,h
+	ld	e,(ix+0Eh)
+	ld	d,(ix+0Fh)
+	dec	de
+	push	de
+.180:	push	de
+	push	hl
+	call	GETFAT
+	pop	hl
+	pop	de
+	jr	nz,.179
+	inc	bc
+.179:	inc	hl
+	dec	de
+	ld	a,e
+	or	d
+	jr	nz,.180
+	ld	h,b
+	ld	l,c
+	pop	de
+	ld	a,(ix+6)
+	inc	a
+	ld	c,(ix+2)
+	ld	b,(ix+3)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- resed disk system
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0D:ld	hl,80h
+	ld	(0F23Dh),hl
+	xor	a
+	ld	(0F247h),a
+	call	WriteChangedSect
+	ld	hl,0F355h
+	ld	a,(0F347h)
+.181:	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	inc	hl
+	push	hl
+	push	af
+	push	de
+	pop	ix
+	call	DoUpdateFAT
+	pop	af
+	pop	hl
+	dec	a
+	jr	nz,.181
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get default drive
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_19:ld	a,(0F247h)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get record no
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_24:call	CPM2DOS
+	ld	(iy+21h),l
+	ld	(iy+22h),h
+	ld	(iy+23h),e
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set default drive
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0E:ld	a,(0F347h)
+	cp	e
+	ret	c
+	ret	z
+	ld	hl,0F247h
+	ld	(hl),e
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get string
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0A:push	de
+	ld	a,(0F237h)
+	ld	(0F238h),a
+	xor	a
+	ld	(0F239h),a
+	ld	h,d
+	ld	l,e
+	ld	b,a
+	ld	c,(hl)
+	inc	hl
+	ld	d,a
+	ld	e,(hl)
+	inc	hl
+	ld	ix,0F459h
+	ld	a,e
+	cp	c
+	jr	nc,.182
+	push	hl
+	add	hl,de
+	ld	a,(hl)
+	pop	hl
+	cp	0Dh
+.182:	jr	z,gs@6
+	ld	e,d
+gs@6:	call	0F2ACh		;loop: scan next character
+	call	BDOS_8
+.184:	push	hl
+	push	bc
+	ld	hl,gs@@tab
+	ld	bc,11h
+	cpir
+	add	hl,bc
+	add	hl,bc
+	add	hl,bc
+	ld	c,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,c
+	pop	bc
+	ex	(sp),hl
+	ret
+;
+gs@grph:call	BDOS_8
+	cp	'@'
+	jr	c,.184
+	cp	'`'
+	jr	nc,.184
+	push	af
+	ld	a,b
+	inc	a
+	cp	c
+	jr	nc,.185
+	ld	a,1
+	ld	(ix),a
+	inc	ix
+	inc	b
+	call	EchoPr
+	pop	af
+gs@nc:	push	af
+	ld	a,b
+	cp	c
+	jr	nc,.185
+	pop	af
+	ld	(ix),a
+	inc	ix
+	inc	b
+	call	EchoPr
+	ld	a,(0F239h)
+	or	a
+	jr	nz,gs@6
+	inc	d
+	ld	a,e
+	cp	d
+	jr	c,gs@6
+	ld	a,(hl)
+	dec	a
+	inc	hl
+	jr	nz,gs@6
+	inc	d
+	inc	hl
+	jr	gs@6
+;
+.185:	pop	af
+	ld	a,7
+	call	Char2CON
+	jr	gs@6
+;
+gs@up:	pop	de
+	ld	a,(0F238h)
+	ld	b,a
+	ld	a,(0F237h)
+	sub	b
+	jr	z,.188
+	ld	b,a
+.189:	call	DlLast
+	djnz	.189
+.188:	jp	BDOS_0A
+;
+gs@lf:	ld	a,b
+	ld	(0F23Ah),a
+	call	NL@
+.198:	jr	gs@6
+;
+NL@:	ld	a,0Dh
+	call	Char2CON
+	ld	a,0Ah
+	jp	Char2CON
+;
+gs@cr:	pop	de
+S518E:	call	Char2CON
+	push	de
+	inc	de
+	ld	a,b
+	ld	(de),a
+	cp	c
+	push	af
+	inc	de
+	ld	c,b
+	xor	a
+	ld	b,a
+	or	c
+	jr	z,.191
+	ld	hl,0F459h
+	ldir
+.191:	pop	af
+	jr	z,.192
+	ld	a,0Dh
+	ld	(de),a
+.192:	pop	de
+	ret
+;
+gs@bs:	ld	a,(0F23Ah)
+	and	b
+	cp	7Fh
+	jp	z,OutCopyRight
+	inc	b
+	dec	b
+	jr	z,.205
+	dec	b
+	dec	ix
+	call	DlLast
+	inc	b
+	dec	b
+	jr	z,.195
+	dec	b
+	dec	ix
+	ld	a,(ix)
+	dec	a
+	jr	z,.205
+	inc	b
+	inc	ix
+.195:	ld	a,(ix)
+	cp	' '
+	jr	nc,.205
+	cp	9
+	jr	z,.196
+	call	DlLast
+.205:	ld	a,(0F239h)
+	or	a
+	jr	nz,.198
+	inc	d
+	dec	d
+	jr	z,.198
+	dec	d
+	ld	a,d
+	cp	e
+	jr	nc,.198
+	dec	hl
+	ld	a,d
+	cp	1
+	jr	c,.198
+	dec	hl
+	ld	a,(hl)
+	dec	a
+	inc	hl
+	jr	nz,.198
+	dec	d
+	dec	hl
+	jr	.198
+;
+.196:	push	hl
+	push	bc
+	ld	a,(0F238h)
+	ld	c,a
+	inc	b
+	dec	b
+	jr	z,.199
+	ld	hl,0F459h
+.202:	ld	a,(hl)
+	inc	hl
+	cp	1
+	jr	z,.206
+	inc	c
+	cp	' '
+	jr	nc,.206
+	cp	9
+	jr	z,.201
+	inc	c
+.206:	djnz	.202
+.199:	ld	a,(0F237h)
+	sub	c
+	jr	z,.203
+	ld	b,a
+.204:	call	DlLast
+	djnz	.204
+.203:	pop	bc
+	pop	hl
+	jr	.205
+;
+.201:	ld	a,c
+	add	a,7
+	and	0F8h
+	ld	c,a
+	jr	.206
+;
+gs@ins:	ld	a,(0F239h)
+	xor	1
+	jr	.208
+	xor	a
+	jr	.208
+	ld	a,1
+.208:	ld	(0F239h),a
+	jp	gs@6
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	print copyright
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+OutCopyRight:
+	xor	a
+	ld	(0F23Ah),a
+	push	bc
+	ld	b,10h
+	ld	de,copyrite
+	ld	hl,0
+.210:	push	hl
+	call	Get6b
+	add	a,' '
+	call	Char2CON
+	ld	a,h
+	add	a,' '
+	call	Char2CON
+	pop	hl
+	inc	hl
+	djnz	.210
+	pop	bc
+;
+gs@home:
+	ld	a,8Fh
+	pop	de
+	call	S518E
+	call	NL@
+	ld	a,(0F238h)
+	or	a
+	jp	z,BDOS_0A
+	ld	b,a
+	ld	a,' '
+.211:	call	Char2CON
+	djnz	.211
+	jp	BDOS_0A
+;
+gs@dwn:	ld	a,0FFh
+	jr	.214
+;
+gs@cls:	call	S52E3
+	jp	c,gs@6
+	push	bc
+	ld	c,a
+	ld	b,0
+	add	hl,bc
+	pop	bc
+	add	a,d
+	ld	d,a
+	jp	gs@6
+;
+gs@select:
+	call	S52E3
+	jp	c,gs@6
+	jr	.214
+;
+gs@del:	ld	a,d
+	cp	e
+	jp	nc,gs@6
+	inc	d
+	ld	a,(hl)
+	dec	a
+	inc	hl
+	jp	nz,gs@6
+	inc	d
+	inc	hl
+	jp	gs@6
+;
+gs@right:
+	ld	a,(hl)
+	dec	a
+	ld	a,1
+	jr	nz,.214
+	inc	a
+.214:	push	af
+	xor	a
+	ld	(0F239h),a
+	ld	a,b
+	cp	c
+	jr	nc,.216
+	ld	a,d
+	cp	e
+	jr	nc,.216
+	ld	a,(hl)
+	cp	1
+	jr	nz,.217
+	ld	a,b
+	inc	a
+	cp	c
+	jr	nc,.216
+	ld	a,(hl)
+.217:	inc	hl
+	ld	(ix),a
+	inc	ix
+	call	EchoPr
+	inc	b
+	inc	d
+	pop	af
+	dec	a
+	jr	nz,.214
+	jp	gs@6
+;
+.216:	pop	af
+	jp	gs@6
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S52E3:	call	BDOS_8
+	cp	1
+	jr	nz,S531F
+	call	BDOS_8
+	cp	'@'
+	jr	c,S531F
+	cp	'`'
+	jr	nc,S531F
+	push	hl
+	push	de
+	push	bc
+	ld	iy,0
+.222:	scf
+	push	af
+	ld	a,1
+	call	S531F
+	jr	c,.221
+	ld	c,a
+	ld	b,0
+	add	hl,bc
+	add	a,d
+	ld	d,a
+	push	iy
+	pop	af
+	add	a,c
+	push	af
+	pop	iy
+	inc	hl
+	pop	af
+	cp	(hl)
+	dec	hl
+	jr	nz,.222
+	push	iy
+.221:	pop	af
+	pop	bc
+	pop	de
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S531F:	push	bc
+	push	af
+	ld	a,e
+	sub	d
+	jr	c,.223
+	jr	z,.223
+	dec	a
+	jr	z,.223
+	ld	c,a
+	ld	b,0
+	pop	af
+	push	hl
+	push	af
+	ld	a,(hl)
+	dec	a
+	jr	nz,.224
+	inc	hl
+	dec	c
+.224:	pop	af
+	inc	c
+	dec	c
+	jr	nz,.225
+	pop	hl
+	pop	bc
+	scf
+	ret
+;
+.225:	inc	hl
+	cpir
+	pop	hl
+	jr	nz,.226
+	ld	a,e
+	sub	d
+	dec	a
+	sub	c
+	pop	bc
+	ret
+;
+.223:	pop	af
+.226:	pop	bc
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Delete char on screen
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DlLast:	ld	a,8
+	call	Char2CON
+	ld	a,' '
+	call	Char2CON
+	ld	a,8
+	jr	Char2CON
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	echo printing
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+EchoPr:	cp	' '
+	jr	nc,Char2CON
+	cp	9
+	jr	z,Char2CON
+	cp	1
+	jr	z,Char2CON
+	push	af
+	ld	a,'^'
+	call	Char2CON
+	pop	af
+	or	'@'
+	jr	Char2CON
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Table for BDOS 0Ah
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+gs@@tab:db	6,7Fh,8,0Dh,0Ah,15h,0Bh,0Ch,1Bh,12h,18h,1Ch,1Dh,1Eh,1Fh,1,8
+;
+	dw	gs@nc
+	dw	gs@grph
+	dw	gs@dwn
+	dw	gs@up
+	dw	gs@bs
+	dw	gs@right
+	dw	gs@select
+	dw	gs@ins
+	dw	gs@up
+	dw	gs@cls
+	dw	gs@home
+	dw	gs@up
+	dw	gs@lf
+	dw	gs@cr
+	dw	gs@bs
+	dw	gs@del
+	dw	gs@6
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2:	ld	a,e
+Char2CON:
+	call	0F2AFh
+	cp	0Bh
+	jr	z,pc_home
+	cp	0Ch
+	jr	z,pc_home
+	cp	1Ch
+	jr	z,pc_right
+	cp	1Dh
+	jr	z,pc_bs
+	cp	0Dh
+	jr	z,pc_home
+	cp	8
+	jr	z,pc_bs
+	cp	9
+	jr	z,pc_tab
+	cp	7Fh
+	jr	z,pc_bs
+	cp	' '
+	jr	c,pc_right
+	push	hl
+	ld	hl,0F237h
+	inc	(hl)
+	pop	hl
+pc_right:
+	push	bc
+	ld	b,a
+	call	Check4print
+	ld	a,b
+	call	PutChar
+	ld	a,(0F23Bh)
+	or	a
+	ld	a,b
+	pop	bc
+	ret	z
+	jp	PrintChar
+;
+pc_home:
+	push	af
+	xor	a
+	ld	(0F237h),a
+	pop	af
+	jr	pc_right
+pc_bs:	push	hl
+	ld	hl,0F237h
+	dec	(hl)
+	pop	hl
+	jr	pc_right
+;
+pc_tab:	ld	a,' '
+	call	Char2CON
+	ld	a,(0F237h)
+	and	7
+	jr	nz,pc_tab
+	ret
+;
+.236:	cp	10h
+	jr	z,GetcCheck
+	cp	0Eh
+	jr	z,GetcCheck
+	cp	3
+	jr	z,GetcCheck
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Check CTRL-P, CTRL-N
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Check4print:
+	call	SenseCtrlC
+	ret	z
+	cp	13h
+	jr	nz,.236
+	call	CharAvail
+GetcCheck:
+	call	CharAvail
+	cp	10h
+	jr	z,.237
+	cp	0Eh
+	jr	z,.238
+	cp	3
+	ret	nz
+	ld	hl,(0F325h)
+	jp	0F1E8h
+;
+.237:	ld	a,1
+	ld	(0F23Bh),a
+	ret
+;
+.238:	xor	a
+	ld	(0F23Bh),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- Get keyboard status
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_0B:call	Check4print
+	ld	a,0
+	ret	z
+	or	0FFh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get char w/echo
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_1:	call	BDOS_8
+	push	af
+	call	Char2CON
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get char
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_8:	call	GetcCheck
+	jr	z,BDOS_8
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get/put char
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_6:	ld	a,e
+	cp	0FFh
+	jp	nz,PutChar
+	call	SenseCtrlC
+	jp	nz,CharAvail
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get char/no control
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_7:	jp	CharAvail
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- print char
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_5:	ld	a,e
+Char2PRN:
+	push	af
+	call	Check4print
+	pop	af
+	jp	PrintChar
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- input AUX
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_3:	call	Check4print
+	jp	0F371h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- output AUX
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_4:	ld	a,e
+Char2AUX:
+	push	af
+	call	Check4print
+	pop	af
+	jp	0F374h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+; My copyright (SOLID) - do not remove
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+copyrite:
+	db	0EDh,8Ch,37h,0E4h,3Bh,03h,0C8h,98h,00h,51h,96h,4Dh,0C0h,0FCh
+	db	0B2h,29h,39h,0BFh,26h,0Dh,0A4h,0EEh,0E8h,00h,0C9h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Date conversion
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ConvDate:
+	call	0F2B2h
+	call	GetCurDate
+	ld	a,c
+	add	a,a
+	add	a,a
+	add	a,a
+	rl	b
+	add	a,a
+	rl	b
+	add	a,a
+	rl	b
+	srl	d
+	or	d
+	ld	e,a
+	ld	d,b
+	ld	bc,(0F249h)
+	ld	a,c
+	add	a,a
+	add	a,a
+	add	a,a
+	add	a,a
+	add	a,a
+	rl	b
+	ld	c,a
+	ld	a,(0F248h)
+	or	c
+	ld	c,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get date
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetCurDate:
+	call	GetClockDate
+	jr	c,.242
+	push	de
+	push	hl
+	ld	de,(0F24Ch)
+	or	a
+	sbc	hl,de
+	pop	hl
+	pop	de
+	ret	z
+	ld	(0F24Ch),hl
+	push	bc
+	push	de
+	ld	c,l
+	ld	b,h
+	ld	de,05B5h
+	call	DIV_BC_DE
+	ld	a,c
+	add	a,a
+	add	a,a
+	add	a,a
+	ld	b,0
+	ld	de,T5534
+	call	S5515
+	srl	a
+	jr	nc,.243
+	ld	de,0C8h
+	add	hl,de
+.243:	call	SetFebDays
+	ld	a,1
+	ld	de,0F22Bh
+	call	S5515
+	ld	(0F249h),a
+	inc	l
+	ld	a,l
+	ld	(0F248h),a
+.244:	call	S5588
+	pop	de
+	pop	bc
+	ret
+;
+.242:	push	bc
+	push	de
+	ld	hl,(0F24Ah)
+	call	S559D
+	jr	.244
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S5515:	ex	de,hl
+	ld	c,(hl)
+	inc	hl
+	ex	de,hl
+	or	a
+	sbc	hl,bc
+	jr	c,.245
+	inc	a
+	jr	S5515
+;
+.245:	add	hl,bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetFebDays:
+	call	0F2B5h
+	ld	(0F24Ah),a
+_febdays:
+	and	3
+	ld	a,1Ch
+	jr	nz,.246
+	inc	a
+.246:	ld	(0F22Ch),a
+	ret
+
+T5534:	db	0C8h,0A6h,0C8h,0A5h,0C8h,0A5h,0C8h,0A5h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- get date
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2A:xor	a
+	ld	(0F306h),a
+	call	GetCurDate
+	ld	hl,(0F24Ah)
+	ld	de,07BCh
+	add	hl,de
+	ld	de,(0F248h)
+	ld	a,(0F24Eh)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set date
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2B:ld	bc,0F844h
+	add	hl,bc
+	jr	nc,.247
+	ld	a,h
+	or	a
+	jr	nz,.247
+	ld	a,l
+	cp	'x'
+	jr	nc,.247
+	call	_febdays
+	inc	e
+	dec	e
+	jr	z,.247
+	ld	a,d
+	or	a
+	jr	z,.247
+	cp	0Dh
+	jr	nc,.247
+	push	hl
+	ld	hl,0F22Ah
+	add	a,l
+	ld	l,a
+	jr	nc,.248
+	inc	h
+.248:	ld	a,(hl)
+	pop	hl
+	cp	e
+	jr	c,.247
+	ld	(0F248h),de
+	call	S559D
+	call	S4115
+S5588:	ld	bc,(0F24Ch)
+	ld	de,7
+	inc	bc
+	inc	bc
+	call	DIV_BC_DE
+	ld	a,l
+	ld	(0F24Eh),a
+	xor	a
+	ret
+;
+.247:	ld	a,0FFh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S559D:	ld	a,l
+	call	SetFebDays
+	ld	c,l
+	srl	c
+	srl	c
+	ld	b,0
+	ld	de,05B5h
+	call	Mul_DE_BC
+	ld	l,c
+	ld	h,b
+	ld	a,(0F24Ah)
+	and	3
+	add	a,a
+	ld	de,T5534
+	ld	b,0
+	inc	a
+	call	S55D2
+	ld	de,0F22Bh
+	ld	a,(0F249h)
+	call	S55D2
+	ld	a,(0F248h)
+	dec	a
+	ld	c,a
+	add	hl,bc
+	ld	(0F24Ch),hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S55D2:	dec	a
+	ret	z
+	ex	de,hl
+	ld	c,(hl)
+	inc	hl
+	ex	de,hl
+	add	hl,bc
+	jr	S55D2
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- Get time
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2C:xor	a
+	ld	(0F306h),a
+	call	GetCurDate
+	ld	h,b
+	ld	l,c
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set time
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2D:ld	b,h
+	ld	c,l
+	ld	a,b
+	cp	24
+	jr	nc,.247
+	ld	a,59
+	cp	c
+	jr	c,.247
+	cp	d
+	jr	c,.247
+	ld	a,e
+	cp	100
+	jr	nc,.247
+	call	SetCurDate
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS -- set verify mode
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BDOS_2E:ld	a,e
+	ld	(0F30Dh),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Convert & check FCB (T.NORM)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ConvertFCB:
+	ld	a,(hl)
+	cp	' '
+	scf
+	ret	z
+	ld	bc,0802h
+	cp	0E5h
+	jr	nz,.249
+	ld	a,5
+	ld	(de),a
+	inc	hl
+	inc	de
+	dec	b
+	ld	a,0E5h
+	call	S5681
+	jr	nc,.249
+	ld	a,(hl)
+	ld	(de),a
+	inc	hl
+	inc	de
+	dec	b
+.249:	ld	a,(hl)
+	call	S5681
+	jr	nc,.250
+	ld	(de),a
+	inc	hl
+	inc	de
+	dec	b
+	scf
+	ret	z
+	ld	a,(hl)
+	jr	.251
+;
+.250:	ld	a,(0F30Eh)
+	and	a
+	ld	a,(hl)
+	jr	z,.252
+	cp	80h
+	jr	c,.252
+	cp	0BAh
+	jr	nc,.252
+	push	hl
+	push	bc
+	ld	c,a
+	ld	b,0
+	ld	hl,OtherNameChars-80h
+	add	hl,bc
+	ld	a,(hl)
+	pop	bc
+	pop	hl
+.252:	cp	'a'
+	jr	c,.253
+	cp	7Bh
+	jr	nc,.253
+	sub	' '
+.253:	cp	' '
+	ret	c
+	push	hl
+	push	bc
+	ld	hl,$bd_nam
+	ld	bc,0Ah
+	cpir
+	pop	bc
+	pop	hl
+	scf
+	ret	z
+.251:	ld	(de),a
+	inc	hl
+	inc	de
+	djnz	.249
+	ld	b,3
+	dec	c
+	jr	nz,.249
+	or	a
+	ld	a,(hl)
+	ld	(0F30Ch),a
+	ret
+;
+$bd_nam:db	'."/[]:+=;,'
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S5681:	push	hl
+	ld	hl,0F30Fh
+	cp	(hl)
+	ccf
+	jr	nc,.254
+	inc	hl
+	cp	(hl)
+	jr	c,.254
+	inc	hl
+	cp	(hl)
+	ccf
+	jr	nc,.254
+	inc	hl
+	cp	(hl)
+.254:	pop	hl
+	ret
+;
+OtherNameChars:
+	db	80h,9Ah,'EA',8Eh,'A',8Fh,80h,'EEEIII',8Eh,8Fh,90h,92h,92h,'O'
+	db	99h,'OUUY',99h,9Ah,9Bh,9Ch,9Dh,9Eh,9Fh,'AIOU',0A5h,0A5h,0A6h
+	db	0A7h,0A8h,0A9h,0AAh,0ABh,0ACh,0ADh,0AEh,0AFh,0B0h,0B0h,0B2h
+	db	0B2h,0B4h,0B4h,0B6h,0B6h,0B8h,0B8h
+;
+;
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;››                                                                          ››
+;››           From this point of Disk ROM any routines can be changed        ››
+;››           for matching OEM's requirements. No direct calls to this       ››
+;››           part of Disk ROM may be executed from external programs.       ››
+;››                                                                          ››
+;››           The part from now till next section "Low level routines"       ››
+;››           is used for initialization and BASIC statements handling.      ››
+;››                                                                          ››
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;
+;
+;
+BDOS_reserved:
+	xor	a
+	ld	b,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS call for BASIC BLOADs
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Basic_F37D:
+	ei
+	ld	a,1
+	ld	(0F306h),a
+	ld	a,c
+	cp	'1'
+	jr	nc,BDOS_reserved
+	sub	11h
+	jr	nz,.256
+	ld	(0F307h),de
+.256:	dec	a
+	jr	nz,.257
+	ld	de,(0F307h)
+.257:	push	hl
+	ld	hl,$BdosRet
+	ex	(sp),hl
+	push	hl
+	ld	hl,$BdosTable
+	ld	b,0
+	add	hl,bc
+	add	hl,bc
+	ld	b,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,b
+	ex	(sp),hl
+	ret
+;
+;WWWWWWWWWWWWWWWWWWWWWWWWWW here indirect call is performed
+;
+$BdosRet:
+	push	af
+	ld	a,(0F306h)
+	or	a
+	jr	z,.258
+	pop	af
+	ld	l,a
+	ld	h,b
+	ret
+;
+.258:	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BDOS routines vector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+$BdosTable:
+	dw	GotoBasic
+	dw	BDOS_1
+	dw	BDOS_2
+	dw	BDOS_3
+	dw	BDOS_4
+	dw	BDOS_5
+	dw	BDOS_6
+	dw	BDOS_7
+	dw	BDOS_8
+	dw	0F1C9h
+	dw	BDOS_0A
+	dw	BDOS_0B
+	dw	BDOS_0C
+	dw	BDOS_0D
+	dw	BDOS_0E
+	dw	BDOS_0F
+	dw	BDOS_10
+	dw	BDOS_11
+	dw	BDOS_12
+	dw	BDOS_13
+	dw	BDOS_14
+	dw	BDOS_15
+	dw	BDOS_16
+	dw	BDOS_17
+	dw	BDOS_18
+	dw	BDOS_19
+	dw	BDOS_1A
+	dw	BDOS_1B
+	dw	BDOS_reserved
+	dw	BDOS_reserved
+	dw	BDOS_reserved
+	dw	BDOS_reserved
+	dw	BDOS_reserved
+	dw	BDOS_21
+	dw	BDOS_22
+	dw	BDOS_23
+	dw	BDOS_24
+	dw	BDOS_reserved
+	dw	BDOS_26
+	dw	BDOS_27
+	dw	BDOS_28
+	dw	BDOS_reserved
+	dw	BDOS_2A
+	dw	BDOS_2B
+	dw	BDOS_2C
+	dw	BDOS_2D
+	dw	BDOS_2E
+	dw	BDOS_2F
+	dw	BDOS_30
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	HDD ROM startup initializer
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_ROM_Startup:
+	ld	a,6
+	call	0141h			;Check for CTRL, if pressed, no HDD
+	di				;boot performed!
+	and	2
+	ret	z
+	call	InitFileSystem		;HDD present ?
+	ret	c			;No -> exit
+	ld	a,(0FD99h)
+	and	a			;SHIFT pressed
+	ret	m
+	jp	nz,.260			;not first time initialized
+	ld	hl,0FB20h
+	bit	0,(hl)
+	jr	nz,.261
+	set	0,(hl)
+	ld	hl,0FFCAh
+	ld	b,0Fh
+.262:	ld	(hl),0C9h		;clear EBIOS hooks
+	inc	hl
+	djnz	.262
+.261:	ld	hl,(0FC48h)
+	ld	de,0C001h
+	rst	20h
+	jr	nc,.263			;out of memory
+	ld	a,6
+	call	0141h
+	di
+	rrca
+	jr	c,.264
+	ld	a,7			;SHIFT pressed!
+	rst	18h
+.263:	ld	a,0FFh
+	ld	(0FD99h),a
+	ret
+;
+.264:	ld	hl,0F396h
+	ld	de,0F1C9h
+	and	a
+	sbc	hl,de
+	call	nc,_malloc
+	ret	c
+.259:	push	hl
+	ld	hl,0FE49h
+	ld	bc,0F1C9h
+.265:	xor	a
+	ld	(bc),a
+	inc	bc
+	inc	hl
+	ld	a,l
+	or	h
+	jr	nz,.265
+	ld	(0F6ABh),hl
+	ld	b,14h
+	ld	hl,0FB21h
+.266:	ld	(hl),a
+	inc	hl
+	djnz	.266
+	ld	hl,0F24Fh
+	ld	b,69h
+.267:	ld	(hl),0C9h
+	inc	hl
+	djnz	.267
+	ld	a,0DBh		;IN A,(0A8h)
+	ld	hl,0C9A8h	;RET
+	ld	(0F365h),a
+	ld	(0F366h),hl
+	ld	a,6
+	call	0141h
+	and	2
+	ld	(0F33Fh),a
+	ld	a,7
+	rst	18h
+	ld	hl,hInit2
+	ld	de,0FECBh
+	ld	bc,5
+	ldir
+	call	402Dh
+	ld	(0FECCh),a
+	pop	de
+	jr	.268
+;
+hInit2:	rst	30h
+	nop
+	dw	NextInit
+	ret
+;
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW Not first DISK ROM
+;
+.260:	ld	hl,hInit2	;*ALSO* intercepts hook
+	ld	de,0FECBh
+	ld	bc,5
+	ldir
+	call	402Dh
+	ld	(0FECCh),a
+	ld	hl,0FB21h
+	ld	b,4
+	xor	a
+.270:	add	a,(hl)
+	jp	c,NoMemry
+	inc	hl
+	inc	hl
+	djnz	.270
+	cp	8
+	ret	nc
+	ld	hl,16h		;allocate work buffer
+	call	_malloc
+	ret	c
+	ex	de,hl
+.268:	call	GetWorkRAMAdr
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ld	hl,(0F6ABh)
+	ld	de,0200h
+	rst	20h
+	jr	nc,.271
+	ld	(0F6ABh),de
+.271:	ld	a,(0FB21h)
+	ld	c,a
+	ld	de,0FB23h
+	ld	b,3
+.273:	ld	a,(de)
+	and	a
+	jr	z,.272
+	add	a,c
+	ld	c,a
+	inc	de
+	inc	de
+	djnz	.273
+	jp	NoMemry
+;
+.272:	ld	a,(0F33Fh)
+	and	a
+	ld	a,c
+	call	GetHardDiskCount
+	add	a,l
+	cp	9
+	ld	a,l
+	jr	c,.275
+	ld	a,8
+	sub	c
+.275:	ld	(de),a
+	push	af
+	inc	de
+	call	402Dh
+	ld	(de),a
+	pop	af
+	ld	b,a
+	ld	hl,0F359h
+.283a:	push	bc		;copy some default DPBs for DOS2 to work properly
+	push	hl
+	ld	hl,15h
+	call	AllocMem
+	ex	de,hl
+	pop	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	inc	hl
+	push	hl
+	ld	hl,DEFAULT_DPB-1
+	ld	bc,15h
+	ldir
+	pop	hl
+	pop	bc
+	djnz	.283a
+;
+	ld	hl,0FD99h
+	inc	(hl)
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Final BIOS initialization
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+NextInit:
+	ld	hl,0FECBh
+	ld	b,5
+.276:	ld	(hl),0C9h
+	inc	hl
+	djnz	.276
+	ld	hl,0FD99h
+	xor	a
+	cp	(hl)
+	ld	(hl),a
+	ret	p
+	call	SetRuHook
+	ld	(0F348h),a
+	ld	hl,DiskHiRes
+	ld	de,0F1C9h
+	ld	bc,6Eh
+	ldir
+	ld	hl,34h
+	ld	de,0F30Fh
+	ld	bc,4
+	ldir
+	ld	a,(2Bh)
+	rrca
+	rrca
+	rrca
+	rrca
+	and	7
+	ld	(0F30Eh),a
+	ld	a,0FFh
+	ld	(0F241h),a
+	ld	(0F246h),a
+	ld	(0F24Dh),a
+	ld	a,0Dh
+	ld	(0F55Bh),a
+	ld	a,7
+	ld	(0F345h),a
+	ld	hl,05B5h
+	ld	(0F33Bh),hl
+	ld	b,8
+	ld	hl,0F368h
+.277:	ld	(hl),0C3h
+	inc	hl
+	inc	hl
+	inc	hl
+	djnz	.277
+	ld	hl,0FB21h
+	ld	bc,0400h
+.281:	ld	a,(hl)
+	or	a
+	jr	z,.278
+	add	a,c
+	ld	c,a
+	inc	hl
+	inc	hl
+	djnz	.281
+.278:	ld	a,c
+	or	a
+	jr	nz,.280
+	ld	hl,0FB23h
+	ld	de,0FB21h
+	ld	bc,6
+	ldir
+	ld	(hl),0
+	ld	hl,0FB21h
+	ld	bc,0300h
+	jr	.281
+;
+.280:	ld	b,c
+	ld	hl,0F355h
+.283:	push	bc
+	push	hl
+	ld	a,(hl)
+	inc	hl
+	or	(hl)
+	jr	nz,.282
+	ld	hl,15h
+	call	AllocMem
+	ex	de,hl
+	pop	hl
+	push	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ld	hl,DEFAULT_DPB-1
+	ld	bc,15h
+	ldir
+.282:	pop	hl
+	inc	hl
+	inc	hl
+	pop	bc
+	djnz	.283
+	ld	hl,(0F6ABh)
+	push	hl
+	call	AllocMem
+	ld	(0F34Dh),hl
+	pop	hl
+	push	hl
+	call	AllocMem
+	ld	(0F34Fh),hl
+	pop	hl
+	push	hl
+	call	AllocMem
+	ld	(0F351h),hl
+	pop	hl
+	ld	d,h
+	ld	e,l
+	add	hl,hl
+	add	hl,de
+	inc	hl
+	call	AllocMem
+	ld	(0F349h),hl
+	inc	hl
+	ld	(0FFDBh),hl
+	ld	hl,0FB21h
+	ld	b,4
+	xor	a
+.284:	add	a,(hl)
+	jp	c,NoMemry
+	inc	hl
+	inc	hl
+	djnz	.284
+	cp	9
+	jp	nc,NoMemry
+	ld	(0F347h),a
+	ld	b,a
+	ld	c,0
+	ld	hl,0F355h
+.285:	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	inc	hl
+	push	hl
+	push	de
+	pop	ix
+	ld	(ix),c
+	ld	hl,(0FFDBh)
+	ld	(ix+13h),l
+	ld	(ix+14h),h
+	inc	c
+	pop	hl
+	djnz	.285
+	ld	a,0FFh
+	ld	(0FFD9h),a
+	ld	hl,0F327h
+	ld	(hl),3Eh	;ld a,"EOF" for AUX input
+	inc	hl
+	ld	(hl),1Ah
+	ld	b,8
+.286:	inc	hl
+	ld	(hl),0C9h
+	djnz	.286
+	ld	hl,0F327h
+	ld	(0F372h),hl
+	ld	hl,0F32Ch
+	ld	(0F375h),hl
+	ld	hl,0F331h
+	ld	(0F37Eh),hl
+	ld	hl,7D2Fh
+	ld	a,(0FCC1h)
+	call	0Ch
+	push	af
+	inc	hl
+	ld	a,(0FCC1h)
+	call	0Ch
+	pop	de
+	ld	h,a
+	ld	l,d
+	push	hl
+	pop	ix
+	ld	iy,(0FCC0h)
+	call	1Ch
+	call	TestClock
+	call	InitBasHooks
+	ld	a,(0FCC1h)
+	ld	(0F341h),a
+	ld	(0F342h),a
+	call	GetSlotP2
+	ld	(0F343h),a
+	call	GetSlotP3
+	ld	(0F344h),a
+	ld	c,0
+	call	TryFindRAM
+	jr	c,.287
+	ld	(0F341h),a
+.287:	ld	c,40h
+	call	TryFindRAM
+	jr	c,.288
+	ld	(0F342h),a
+.288:	ld	sp,0C200h
+	ld	a,(0FEDAh)
+	cp	0C9h
+	jr	z,.289
+	ld	ix,7D17h
+	jr	BASCALL2
+.289:	ld	hl,0FCC9h
+	ld	b,40h
+.292:	ld	a,(hl)
+	add	a,a
+	jr	c,.291
+	inc	hl
+	djnz	.292
+	jr	.293
+;
+.291:	ld	ix,7E14h
+BASCALL2:
+	call	InitBasicMem
+	jp	0159h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	DOS boot sequence
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+.293:	ld	hl,HDD_RunDiskBasic
+	push	hl
+	call	MasterBoot		;read MBR
+	ret	c
+	call	DiskBootSequence
+	ret	c			;not successfull
+	call	GoBootDisk
+	ld	hl,(0FC48h)
+	ld	de,8000h
+	rst	20h
+	ret	nz
+	ld	hl,0F341h
+	ld	a,(0FCC1h)
+	cp	(hl)
+	ret	z
+	inc	hl
+	cp	(hl)
+	ret	z
+.413:	xor	a
+	call	ResetFATflgs
+	ld	hl,(0F349h)
+	ld	(0F34Bh),hl
+	call	DiskBootSequence
+	jp	c,HDD_RunDiskBasic
+	ld	(0F346h),a
+	ld	a,(0F341h)
+	ld	h,0
+	call	GetSlotMasks
+	scf
+	call	p,SetPSLOT
+	call	c,SetSSLOT
+	xor	a
+	ld	l,a
+	ld	h,a
+.295:	ld	(hl),a
+	inc	l
+	jr	nz,.295
+	ld	bc,26h
+	call	AllocDOS
+	ld	(0F36Fh),hl
+	ex	de,hl
+	ld	hl,XFERsub
+	ldir
+	ld	bc,19h
+	call	AllocDOS
+	ld	e,l
+	ld	d,h
+	ld	(0F369h),hl
+	inc	hl
+	inc	hl
+	ld	(0F36Ch),hl
+	ld	hl,ONOFFsub
+	ldir
+	ld	bc,0177h		;** old value: 168h
+	call	AllocDOS
+	push	hl
+	ex	de,hl
+	ld	hl,SLOTSsub
+	push	hl
+	ldir
+	pop	bc
+	pop	de
+	push	de
+	ld	hl,0126h		;** old value: 0117h
+	add	hl,de
+	ld	(hl),3Bh
+	inc	hl
+	ld	(hl),0
+	ld	hl,SA_RelocT
+	call	Relocate
+;
+	ld	hl,T5B48
+	xor	a
+	ld	b,a
+	ld	d,a
+.297:	ld	e,(hl)
+	cp	e
+	jr	z,.296
+	inc	hl
+	ld	c,(hl)
+	inc	hl
+	ex	(sp),hl
+	add	hl,bc
+	ex	de,hl
+	ld	(hl),0C3h
+	inc	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ex	de,hl
+	ex	(sp),hl
+	jr	.297
+;
+.296:	pop	hl
+	ld	hl,SwitchSSLOT
+	ld	de,3Bh
+	ld	bc,1Ah
+	ldir
+	ld	bc,45h
+	call	AllocDOS
+	push	hl
+	ex	de,hl
+	ld	hl,INTRsub
+	push	hl
+	ldir
+	pop	bc
+	pop	de
+	push	de
+	ld	hl,RT_Intr
+	call	Relocate
+	pop	hl
+	ld	a,0C3h
+	ld	(38h),a
+	ld	(39h),hl
+	ld	de,22h
+	add	hl,de
+	ld	de,(0F34Bh)
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ld	bc,0A0h		;For Interrupt stack
+	call	AllocDOS
+	ld	a,0C3h
+	call	SetROMcalls
+	scf
+GoBootDisk:
+	ld	hl,0F323h
+	ld	de,0F368h
+	ld	a,(0F340h)
+	jp	0C01Eh
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Boot from disk
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DiskBootSequence:
+	ld	c,0F8h
+	ld	b,1
+	ld	hl,(0F351h)
+	push	hl
+	ld	a,(0F247h)
+	ld	de,0
+	or	a
+	call	0144h		;first try to boot from floppy
+	ld	a,0FFh
+	ld	(0F246h),a
+	pop	hl
+	call	c,DOS_HDD_BOOT	;if not successful, try boot HDD
+	ret	c
+	ld	a,(hl)
+	ld	de,0C000h
+	ld	bc,0100h
+	ldir
+	cp	0EBh
+	ret	z
+	cp	0E9h
+	ret	z
+	scf
+	ret
+
+T5B48:	db	0Ch,00h,14h,21h,30h,2Eh,1Ch,11h,24h,57h,00h
+;
+AUTOFCB:db	0,'AUTOEXECBAS',0
+;
+$autorun:
+	db	'RUN"AUTOEXEC.BAS',0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+pphDE_Boot:
+	dw	hDE_boot
+HDD_RunDiskBasic:
+	call	ResetROMcalls
+	ld	hl,$autorun
+	ld	de,0F568h
+	ld	bc,11h
+	ldir
+	ld	hl,0F340h
+	ld	a,(hl)
+	and	a
+	ld	(hl),h
+	jr	nz,.299
+	ld	(0F346h),a
+	ld	hl,pphDE_Boot
+	ld	(0F323h),hl
+	ld	hl,AUTOFCB
+	ld	de,0F579h
+	ld	bc,25h
+	push	de
+	ldir
+	pop	de
+	call	BDOS_0F
+	inc	a
+	jr	z,hDE_boot
+	jr	RunAutoexecBas
+;
+.299:	ld	a,(0)
+	cp	0C3h
+	jr	nz,.305
+	ld	hl,80h
+	ld	b,(hl)
+	inc	b
+	dec	b
+	jr	z,.305
+.304:	inc	hl
+	ld	a,(hl)
+	cp	' '
+	jr	nz,.303
+	djnz	.304
+	jr	.305
+;
+.303:	xor	a
+	ld	c,b
+	ld	b,a
+	ld	de,0F56Ch
+	ldir
+	ld	(de),a
+	jr	RunAutoexecBas
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hDE_boot:
+	ld	sp,0C200h
+	ld	a,(0F338h)
+	and	a
+	call	z,DateInput
+.305:	xor	a
+	ld	(0F56Bh),a
+RunAutoexecBas:
+	ld	sp,0C200h
+	ld	a,(0F343h)
+	ld	h,80h
+	call	24h
+	ld	a,(0FCC1h)
+	ld	h,0
+	call	24h
+	ld	hl,(0FC48h)
+	xor	a
+	ld	(hl),a
+	inc	hl
+	ld	(0F676h),hl
+	ld	(hl),a
+	inc	hl
+	ld	(hl),a
+	inc	hl
+	ld	(0F6C2h),hl
+	ld	hl,0FFFFh
+	ld	(0F41Ch),hl
+	call	InitBasicMem
+	ld	sp,(0F674h)
+	ld	a,0FFh
+	ld	(0F3DEh),a
+	ld	a,0Ch
+	rst	18h
+	ld	ix,7D31h
+	call	0159h
+	call	PrintMsg
+	db	13,10,'SOLID Disk BASIC version 1.3',13,10,0
+	ld	hl,4173h
+	push	hl
+	ld	hl,0F567h
+	push	hl
+	ld	hl,0F59Eh
+	push	hl
+	ld	(hl),0E1h
+	inc	hl
+	ld	(hl),0C9h
+	ld	a,(0FCC1h)
+	ld	h,'@'
+	jp	24h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+InitBasicMem:
+	ld	hl,pBasEH
+	ld	(0F323h),hl
+	ld	hl,pBasCH
+	ld	(0F325h),hl
+	ld	hl,(0F349h)
+	ld	(0FC4Ah),hl
+	ld	a,(0F345h)
+	ld	c,a
+.308:	ld	b,0
+	ld	de,25h
+	call	Mul_DE_BC
+	call	Alloc2
+	ld	(0F353h),hl
+	ld	bc,19h
+	call	Alloc2
+	ld	(0F378h),hl
+	ex	de,hl
+	ld	hl,T62A3
+	ldir
+	ld	hl,0FFF5h
+	add	hl,de
+	ld	(0F37Bh),hl
+	ld	a,(0F348h)
+	ld	de,0FFF9h
+	add	hl,de
+	ld	(hl),a
+	ld	de,0Eh
+	add	hl,de
+	ld	(hl),a
+	call	SetMaxFiles1
+ResetROMcalls:
+	ld	a,0C9h
+SetROMcalls:
+	ld	(0F368h),a
+	ld	(0F36Bh),a
+	ld	(0F36Eh),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+pBasCH:	dw	GotoBasic
+InitBasHooks:
+	ld	hl,T629E
+	ld	de,0FEBCh
+	ld	bc,5
+	ldir
+	ld	hl,BasHookList
+.310:	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	inc	hl
+	ld	a,e
+	or	d
+	ret	z
+	ex	de,hl
+	ld	(hl),0F7h
+	inc	hl
+	ld	a,(0F348h)
+	ld	(hl),a
+	inc	hl
+	ex	de,hl
+	ldi
+	ldi
+	ld	a,0C9h
+	ld	(de),a
+	jr	.310
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BasHookList:
+	dw	0FDEFh
+	dw	_DSKO$
+	dw	0FE17h
+	dw	_DSKI$
+	dw	0FDF9h
+	dw	_RENAME
+	dw	0FDFEh
+	dw	_KILL
+	dw	0FE08h
+	dw	_COPY
+	dw	0FE12h
+	dw	_DSKF
+	dw	0FE21h
+	dw	_LSET
+	dw	0FE26h
+	dw	_RSET
+	dw	0FE2Bh
+	dw	_FIELD
+	dw	0FE30h
+	dw	_MKI$
+	dw	0FE35h
+	dw	_MKS$
+	dw	0FE3Ah
+	dw	_MKD$
+	dw	0FE3Fh
+	dw	_CVI
+	dw	0FE44h
+	dw	_CVS
+	dw	0FE49h
+	dw	_CVD
+	dw	0FE4Eh
+	dw	hGetPointer
+	dw	0FE58h
+	dw	hNoFor
+	dw	0FE5Dh
+	dw	hNullOpen
+	dw	0FE62h
+	dw	hNotFile0
+	dw	0FE71h
+	dw	hBinSave
+	dw	0FE76h
+	dw	hBinLoad
+	dw	0FE7Bh
+	dw	_FILES
+	dw	0FE80h
+	dw	hDiskGET
+	dw	0FE85h
+	dw	hFileOut1
+	dw	0FE8Ah
+	dw	hInpDiskChar
+	dw	0FE99h
+	dw	_LOC
+	dw	0FE9Eh
+	dw	_LOF
+	dw	0FEA3h
+	dw	_EOF
+	dw	0FEADh
+	dw	hBackUp
+	dw	0FEB2h
+	dw	hParDev
+	dw	0FEB7h
+	dw	hNoDevName
+	dw	0FEFDh
+	dw	hERRP
+	dw	0FFA7h
+	dw	PhyDiskIO
+	dw	0FFACh
+	dw	hBasFormat
+	dw	0F331h
+	dw	Basic_F37D
+	dw	0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Input date @ statup
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+$JapDate:
+	db	1,'H-',1,'A-',1,'G):',0		;date in japaneese format
+$UsaDate:
+	db	'M-D-Y):',0
+$EuroDate:
+	db	'D-M-Y):',0
+
+
+DateInput:
+	ld	(0F5C0h),sp
+	ld	a,14h
+	ld	(0F5C2h),a
+.322:
+	call	PrintMsg
+	db	0Dh,0Ah,'Enter date (',0
+	ld	a,(0F30Eh)
+	cp	1
+	ld	hl,$JapDate
+	jr	c,.314
+	ld	hl,$UsaDate
+	jr	z,.314
+	ld	hl,$EuroDate
+.314:	call	PrintString
+	ld	hl,pDateCH
+	ld	(0F325h),hl
+	ld	de,0F5C2h
+	call	BDOS_0A
+	ld	hl,0F5C4h
+	ld	a,(hl)
+	cp	0Dh
+.313:	ret	z
+	ld	a,(0F30Eh)
+	and	a
+	jr	nz,.315
+	call	GetYearNo
+	call	SkipDateSepar
+	ld	d,c
+	ld	a,(hl)
+	inc	hl
+	cp	b
+	jr	nz,.316
+	call	GetDecimal
+	ld	e,c
+	jr	.319
+.315:	call	GetDecimal
+	ld	d,c
+	call	SkipDateSepar
+	ld	e,c
+	ld	a,(hl)
+	inc	hl
+	cp	b
+	jr	nz,.318
+	call	GetYearNo
+	jr	.319
+;
+.318:	push	de
+	call	BDOS_2A
+	push	hl
+	pop	ix
+	pop	de
+.319:	ld	a,(0F30Eh)
+	cp	2
+	jr	c,.320
+	ld	a,e
+	ld	e,d
+	ld	d,a
+.320:	push	ix
+	pop	hl
+	call	BDOS_2B
+	or	a
+	ret	z
+.316:	ld	sp,(0F5C0h)
+	call	PrintMsg
+	db	13,10,'Invalid date',0
+	jp	.322
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SkipDateSepar:
+	ld	a,(hl)
+	inc	hl
+	ld	b,a
+	cp	'/'
+	jr	z,GetDecimal
+	cp	'.'
+	jr	z,GetDecimal
+	cp	'-'
+	jr	nz,.316
+GetDecimal:
+	call	GetDigitx
+	jr	c,.316
+	ld	c,a
+	call	GetDigitx
+	ret	c
+	push	af
+	ld	a,c
+	add	a,a
+	add	a,a
+	add	a,c
+	add	a,a
+	ld	c,a
+	pop	af
+	add	a,c
+	ld	c,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetYearNo:
+	call	GetDecimal
+	ld	b,c
+	call	GetDigitx
+	jr	c,.323
+	dec	hl
+	call	GetDecimal
+	push	hl
+	push	bc
+	ld	c,b
+	ld	b,0
+	push	de
+	ld	de,64h
+	call	Mul_DE_BC
+	pop	de
+	pop	hl
+	ld	h,0
+	jr	.324
+;
+.323:	push	hl
+	ld	c,b
+	ld	b,0
+	ld	hl,076Ch
+	ld	a,c
+	cp	80
+	jr	nc,.324
+	ld	hl,07D0h
+.324:	add	hl,bc
+	push	hl
+	pop	ix
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetDigitx:
+	ld	a,(hl)
+	sub	'0'
+	ret	c
+	cp	0Ah
+	ccf
+	ret	c
+	inc	hl
+	ret
+pDateCH:
+	dw	err$da
+err$da:	ld	sp,(0F5C0h)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+TryFindRAM:
+	ld	hl,0FCC1h
+	ld	b,4
+	xor	a
+.331:	and	3
+	or	(hl)
+.330:	push	bc
+	push	hl
+	ld	h,c
+.328:	ld	l,10h
+.326:	push	af
+	call	0Ch
+	cpl
+	ld	e,a
+	pop	af
+	push	de
+	push	af
+	call	14h
+	pop	af
+	pop	de
+	push	af
+	push	de
+	call	0Ch
+	pop	bc
+	ld	b,a
+	ld	a,c
+	cpl
+	ld	e,a
+	pop	af
+	push	af
+	push	bc
+	call	14h
+	pop	bc
+	ld	a,c
+	cp	b
+	jr	nz,.325
+	pop	af
+	dec	l
+	jr	nz,.326
+	inc	h
+	inc	h
+	inc	h
+	inc	h
+	ld	c,a
+	ld	a,h
+	cp	40h
+	jr	z,.327
+	cp	80h
+	ld	a,c
+	jr	nz,.328
+.327:	ld	a,c
+	pop	hl
+	pop	hl
+	ret
+;
+.325:	pop	af
+	pop	hl
+	pop	bc
+	and	a
+	jp	p,.329
+	add	a,4
+	cp	90h
+	jr	c,.330
+.329:	inc	hl
+	inc	a
+	djnz	.331
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;     Allocate memory from top down
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+AllocDOS:
+	ld	hl,(0F34Bh)
+	and	a
+	sbc	hl,bc
+	ld	(0F34Bh),hl
+	jr	.332
+;
+Alloc2:	ld	hl,(0FC4Ah)
+	and	a
+	sbc	hl,bc
+	ld	(0FC4Ah),hl
+.332:	jr	c,NoMemry
+	ld	a,h
+	cp	0C2h
+	jr	mallo1
+;
+AllocMem:
+	call	_malloc
+mallo1:	ret	nc
+NoMemry:call	PrintMsg
+	db	0Ch
+er_mem:	db	'Not enough memory',0,0
+	di
+	halt
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Allocate top-to-bottom
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_malloc:ld	a,l
+	or	h
+	ret	z
+	xor	a
+	sub	l
+	ld	l,a
+	ld	a,0
+	sbc	a,h
+	ld	h,a
+	ld	c,l
+	ld	b,h
+	add	hl,sp
+	ccf
+	ret	c
+	ld	de,(0FC48h)
+	sbc	hl,de
+	ret	c
+	ld	a,h
+	cp	2
+	ret	c
+	push	bc
+	ld	hl,0
+	add	hl,sp
+	ld	e,l
+	ld	d,h
+	add	hl,bc
+	push	hl
+	ld	hl,(0F674h)
+	and	a
+	sbc	hl,de
+	ld	c,l
+	ld	b,h
+	inc	bc
+	pop	hl
+	ld	sp,hl
+	ex	de,hl
+	ldir
+	pop	bc
+	ld	hl,(0FC4Ah)
+	add	hl,bc
+	ld	(0FC4Ah),hl
+	ld	de,0FDEAh
+	add	hl,de
+	ld	(0F860h),hl
+	ex	de,hl
+	ld	hl,(0F672h)
+	add	hl,bc
+	ld	(0F672h),hl
+	ld	hl,(0F862h)
+	add	hl,bc
+	ld	(0F862h),hl
+	ld	hl,(0F674h)
+	add	hl,bc
+.5F6:	ld	(0F674h),hl
+	dec	hl
+	dec	hl
+	ld	(0F6B1h),hl
+	ld	l,e
+	ld	h,d
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	a,2
+.336:	ex	de,hl
+.335:	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	inc	hl
+	ex	de,hl
+	ld	bc,7
+	ld	(hl),b
+	add	hl,bc
+	ld	(hl),b
+	ld	bc,0102h
+	add	hl,bc
+	dec	a
+	jr	nz,.336
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Other memory setups
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetMaxFiles1:
+	ld	a,1
+	ld	(0F85Fh),a
+	ld	hl,(0FC4Ah)
+	ld	de,0FDEAh
+	add	hl,de
+	ld	(0F860h),hl
+	ld	e,l
+	ld	d,h
+	dec	hl
+	dec	hl
+	ld	(0F672h),hl
+	ld	bc,0C8h
+	and	a
+	sbc	hl,bc
+	push	hl
+	ld	hl,0Dh
+	add	hl,de
+	ld	(0F862h),hl
+	pop	hl
+	jr	.5F6
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Print inline message
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+PrintMsg:
+	ex	(sp),hl
+	call	PrintString
+	ex	(sp),hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Print string
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+PrintString:
+	ld	a,(hl)
+	inc	hl
+	and	a
+	ret	z
+	call	PutChar
+	jr	PrintString
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get slots
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetSlotP3:
+	ld	b,6
+	db	'!'		;LD HL,...
+GetSlotP2:
+	ld	b,4
+	call	0F365h
+	push	bc
+.338:	rrca
+	djnz	.338
+	call	GetExpFlags
+	pop	bc
+	or	(hl)
+	ld	c,a
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	a,(hl)
+	dec	b
+	dec	b
+.339:	rrca
+	djnz	.339
+	jr	.340
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Where am I ???
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetMySlot:
+	call	GetMyPSLOT
+	or	(hl)
+	ret	p
+	ld	c,a
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	a,(hl)
+.340:	and	0Ch
+	or	c
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetWorkBuf:
+	call	GetWorkRAMAdr
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	push	hl
+	pop	ix
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetWorkRAMAdr:
+	call	GetMyPSLOT
+	add	a,a
+	add	a,a
+	add	a,a
+	scf
+	adc	a,a
+	ld	c,a
+	ld	a,(hl)
+	add	a,a
+	sbc	a,a
+	and	0Ch
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	and	(hl)
+	or	c
+	add	a,a
+	ld	hl,0FD09h
+	jr	IndexHL_BC
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetMyPSLOT:
+	call	0F365h
+	rrca
+	rrca
+GetExpFlags:
+	and	3
+	ld	hl,0FCC1h
+IndexHL_A:
+	ld	b,0
+IndexHL_BC:
+	ld	c,a
+	add	hl,bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Sector I/O: all drives OK
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ReadSector_all:
+	and	a
+	jr	PhyDiskIO
+WriteSector_all:
+	scf
+PhyDiskIO:
+	push	ix
+	push	iy
+	push	hl
+	push	af
+	call	GetDiskSlot
+	ld	l,a
+	pop	af
+	ld	a,l
+	ld	ix,4010h
+	jr	.343
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Disk change: all disks OK
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DiskChg_all:
+	push	ix
+	ld	ix,4013h
+	jr	.344
+SetDPB_all:
+	push	ix
+	ld	ix,4016h
+.344:	push	iy
+	push	hl
+	call	GetDiskSlot
+.343:	pop	hl
+	push	hl
+	call	1Ch
+	jp	.345
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get ROM slot for logical dsk
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetDiskSlot:
+	ld	(0F33Fh),a
+	ld	hl,0FB21h
+.347:	sub	(hl)
+	jr	c,.346
+	inc	hl
+	inc	hl
+	jr	.347
+;
+.346:	add	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	push	hl
+	pop	iy
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Restet FAT change flags
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ResetFATflgs:
+	ld	hl,0F355h
+	call	IndexHL_A
+	add	hl,bc
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ld	hl,13h
+	add	hl,de
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	dec	de
+	ex	de,hl
+	ld	(hl),0FFh
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Format drive
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hBasFormat:
+	and	a
+HDD_CondFormat:
+	ld	(0F339h),sp
+	call	nc,AllocMemStack
+	push	hl
+	push	bc
+	ld	a,(0F347h)
+	dec	a
+	jr	z,.348
+.354:	call	PrintMsg
+	db	'Drive name? (',0
+	ld	a,(0F347h)
+	ld	b,a
+	ld	a,'A'
+	jr	.351
+;
+.352:	push	af
+	ld	a,','
+	call	PutChar
+	pop	af
+.351:	call	PutChar
+	inc	a
+	djnz	.352
+	call	PrintMsg
+	db	') ',0
+	call	AskKeyPress
+	call	EchoChar
+	and	0DFh
+	sub	'A'
+	ld	hl,0F347h
+	cp	(hl)
+	jr	nc,.354
+.348:	call	ResetFATflgs
+	call	GetDiskSlot
+	push	iy
+	push	af
+	push	iy
+	ld	ix,4019h
+	call	1Ch
+	ld	a,l
+	or	h
+	jr	z,.355
+	pop	af
+.357:	push	af
+	call	0Ch
+	and	a
+	jr	z,.356
+	call	PutChar
+	inc	hl
+	pop	af
+	jr	.357
+;
+.356:	pop	af
+	call	PrintMsg
+	db	'? ',0
+.356a:	call	AskKeyPress
+	sub	'1'
+	cp	9
+	jr	nc,.356a
+	add	a,'1'
+	call	EchoChar
+	sub	'0'
+.349:	push	af
+.355:	call	WaitAnyKey
+	pop	af
+	pop	de
+	pop	iy
+	pop	bc
+	pop	hl
+	ld	ix,401Ch
+	call	1Ch
+	ld	hl,$fmt_ok
+	jr	nc,.359
+	ld	hl,T6212
+	call	IndexHL_A
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+.359:	call	NewLine
+	call	PrintString
+	jp	NewLine
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+KillbGetc:
+	xor	a
+	ld	(0F336h),a
+	ld	ix,0156h
+	call	BIOS_Call
+	jp	CharAvail
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+WaitAnyKey:
+	call	PrintMsg
+	db	'Strike a key when ready ',0
+AskKeyPress:
+	call	KillbGetc
+	cp	3
+	ret	nz
+	ld	sp,(0F339h)
+	call	PrintMsg
+	db	0Dh,0Ah,'Aborted',0
+	ret
+;
+er_wp:	db	'Write protected',0
+er_nr:	db	'Not ready',0
+er_de:	db	'Disk error',0
+er_bp:	db	'Bad parameter',0
+$fmt_ok:db	'Format complete',0,0
+
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+.488:	ld	de,0F698h
+	ld	hl,(0F678h)
+	ld	(0F7F8h),hl
+	ld	a,3
+	ld	(0F663h),a
+	call	2EF3h
+	ld	de,0F69Bh
+	rst	20h
+	ld	(0F678h),hl
+	ret	nz
+	jp	.368
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Stop motors for all disks
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+StopAll:ld	hl,0FB21h
+	ld	b,4
+.369:	inc	hl
+	ld	a,(hl)
+	push	af
+	pop	iy
+	inc	hl
+	push	hl
+	push	bc
+	ld	hl,401Fh
+	push	hl
+	pop	ix
+	and	a
+	call	nz,0Ch
+.363:	and	a
+	call	nz,1Ch
+	pop	bc
+	pop	hl
+	djnz	.369
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetRuHook:
+	ld	a,(0FED0h)
+	cp	0C9h
+	jr	z,.364
+	ld	hl,T72A8
+	ld	de,0FED5h
+	ld	bc,5
+	ldir
+	call	402Dh
+	ld	(0FED6h),a
+.364:	jp	402Dh
+;
+T6212:	dw	er_wp
+	dw	er_nr
+	dw	er_de
+	dw	er_de
+	dw	er_de
+	dw	er_de
+	dw	er_bp
+	dw	er_mem
+	dw	er_de
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Not used in this ROM
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+InsertDisk:
+	ld	a,(0F33Fh)
+	add	a,'A'
+	call	0F24Fh
+	push	af
+	call	PrintMsg
+	db	0Dh,0Ah,'Insert diskette for drive ',0
+	pop	af
+	call	PutChar
+	call	PrintMsg
+	db	':',0Dh,0Ah,'and strike a key when ready',0
+insd1:	call	KillbGetc
+	cp	3
+	jr	z,insd1
+	jr	NewLine
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+EchoChar:
+	call	PutChar
+NewLine:push	af
+	ld	a,0Dh
+	call	PutChar
+	ld	a,0Ah
+	call	PutChar
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+AllocMemStack:
+	ld	hl,0FF00h
+	add	hl,sp
+	ld	de,(0F6C6h)
+	xor	a
+	sbc	hl,de
+	ld	c,l
+	ld	b,h
+	ex	de,hl
+	ret	nc
+	ld	c,a
+	ld	b,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	This transferred to up
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+T629E:	inc	sp
+	inc	sp
+	jp	6F1Dh
+;
+T62A3:	ld	a,d		;BSAVE/BLOAD hooks
+	cp	9
+	jp	nc,6EC9h
+.371:	rst	30h
+	nop
+	dw	BLOAD_HND
+	push	hl
+	jp	6EF4h
+	ld	a,d
+	cp	9
+	jp	nc,6E95h
+	rst	30h
+	nop
+	dw	BSAVE_HND
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Address relocation sub
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Relocate:
+	push	de
+	ex	de,hl
+	and	a
+	sbc	hl,bc
+	push	hl
+	pop	ix
+.375:	ex	de,hl
+	pop	de
+.383:	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
+	inc	hl
+	ld	a,c
+	and	b
+	inc	a
+	ret	z
+	push	de
+.374:	ex	de,hl
+.376:	add	hl,bc
+	inc	hl
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
+	push	hl
+	push	ix
+	pop	hl
+	add	hl,bc
+	ld	c,l
+	ld	b,h
+	pop	hl
+	ld	(hl),b
+	dec	hl
+	ld	(hl),c
+.377:	ex	de,hl
+	pop	de
+	jr	.383
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	relocation table for ISR
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+RT_Intr:dw	0Ch
+	dw	1Eh
+	dw	2Fh
+	dw	0FFFFh
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	ISR: relocated up for DOS
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+INTRsub:push	ix		;+0
+	push	iy		;+2
+	push	hl		;+4
+	push	de		;+5
+	push	bc		;+6
+	push	af		;+7
+	exx			;+8
+	ex	af,af'		;+9
+	push	af		;+0A
+	push	hl		;+0B
+	ld	hl,(W6315)	;+0C (+1 -> relocate)
+	ld	a,l		;+0F
+	or	h		;+10
+	pop	hl		;+11
+	ld	ix,38h		;+12
+	ld	iy,(0FCC0h)	;+16
+	jr	nz,.384		;+1A
+	pop	af		;+1C
+	ld	(W6315),sp	;+1D (+2 -> rel)
+	ld	sp,0		;+21
+	call	1Ch		;+24
+	di			;+27
+	ld	sp,0		;+28
+W6315	equ	$-2
+
+T6317:	push	hl		;+2B
+	ld	hl,0		;+2C
+	ld	(W6315),hl	;+2F (+1 -> rel)
+	pop	hl		;+32
+.385:	ex	af,af'		;+33
+	exx			;+34
+	pop	af		;+35
+	pop	bc		;+36
+	pop	de		;+37
+.345:	pop	hl		;+38
+	pop	iy		;+39
+	pop	ix		;+3B
+	ei			;+3C
+	ret			;+3D
+;
+.384:	pop	af		;+3E
+	call	1Ch		;+3F
+	jr	.385		;+42 / total len = 44h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	XFER - relocated up
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+XFERsub:push	af
+	push	hl
+	push	de
+	push	bc
+	call	402Dh
+	push	af
+	ld	h,40h
+	ld	a,(0F342h)
+	call	24h
+	pop	af
+	pop	bc
+	pop	de
+	pop	hl
+	ldir
+	push	hl
+	push	de
+	push	bc
+	call	0F368h
+	ld	h,40h
+	call	24h
+	pop	bc
+	pop	de
+	pop	hl
+	pop	af
+	ret
+
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Disk ROM on/off
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ONOFFsub:
+	jr	.386
+	push	af
+	ld	a,(0F342h)
+	jr	.387
+;
+.386:	push	af
+	ld	a,(0F348h)
+.387:	push	hl
+	push	de
+	push	bc
+	ld	h,40h
+	call	24h
+	pop	bc
+	pop	de
+	pop	hl
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;   reloc table for slot addressing
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SA_RelocT:
+	dw	0
+	dw	3
+	dw	10h
+	dw	13h
+	dw	17h
+	dw	1Ch
+	dw	22h
+	dw	25h
+	dw	31h
+	dw	34h
+	dw	39h
+	dw	3Fh
+	dw	68h	;*
+	dw	6Bh	;*
+	dw	73h	;* ins
+	dw	87h
+	dw	8Ah
+	dw	8Dh
+	dw	0A3h
+	dw	0B7h
+	dw	0BAh
+	dw	0C4h
+	dw	0C7h
+	dw	0CBh
+	dw	139h
+	dw	140h
+	dw	147h
+	dw	154h
+	dw	15Ch
+;
+	dw	0FFFFh
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Slot addressing routines
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 0C (read slot sub)
+SLOTSsub:
+	call	GetSlotMasks	;00 (rel)*
+	jp	m,.389		;03 (rel)*
+	in	a,(0A8h)	;06
+	ld	d,a		;08
+	and	c		;09
+	or	b		;0A
+	call	0F380h		;0B
+	ld	a,e		;0E
+	ret			;0F
+;
+.389:	call	S64C7		;10 (rel)*
+	jp	z,.390		;13 (rel)*
+	push	hl		;16
+	call	PutSSLOT	;17 (rel)*
+	ex	(sp),hl		;1A
+	push	bc		;1B
+	call	SLOTSsub	;1C (rel)*
+	jr	.391		;1F
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 14 (write slot sub)
+S63CB:	push	de		;21
+	call	GetSlotMasks	;22 (rel)*
+	jp	m,.392		;25 (rel)*
+	pop	de		;28
+	in	a,(0A8h)	;29
+	ld	d,a		;2B
+	and	c		;2C
+	or	b		;2D
+	jp	0F385h		;2E
+;
+.392:	call	S64C7		;31 (rel)*
+	jp	z,.394		;34 (rel)*
+	ex	(sp),hl		;37
+	push	hl		;38
+	call	PutSSLOT	;39 (rel)*
+	pop	de		;3C
+	ex	(sp),hl		;3D
+	push	bc		;3E
+	call	S63CB		;3F (rel)*
+.391:	pop	bc		;42
+	ex	(sp),hl		;43
+	push	af		;44
+	ld	a,b		;45
+	and	3Fh		;46
+	or	c		;48
+	call	46h		;49
+	pop	af		;4C
+	pop	hl		;4D
+	ret			;4E
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 30 (calls slot sub)
+	ex	(sp),hl		;4F
+	push	af		;50
+	push	de		;51
+	ld	a,(hl)		;52
+	db	0FDh		;53 LD YH,A
+	ld	h,a		;54
+	inc	hl		;55
+	ld	e,(hl)		;56
+	inc	hl		;57
+	ld	d,(hl)		;58
+	inc	hl		;59
+	push	de		;5A
+	pop	ix		;5B
+	pop	de	        ;5D
+	pop	af		;5E
+	ex	(sp),hl		;5F
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 1C (callf slot sub)
+S640B:	exx			;60
+	ex	af,af'		;61
+	push	iy		;62
+	pop	af		;64
+	push	ix		;65
+	pop	hl		;67
+	call	GetSlotMasks	;68 (rel)*
+	jp	m,.395		;6B (rel)
+	ld	a,(0FFFFh)	;6E
+;
+;	FIXUP: in Microsoft's Disk BIOS when *THIS* disk BIOS, placed into
+;	other subslot of MAIN RAM's slot called another (eg. floppy) BIOS
+;	in another slot, control did not return after inter-slot call.
+;	Saving secondary slot register seems to fix this and be quite portable.
+;
+	cpl			;71
+	push	af		;72
+	ld	hl,sscret	;73 (rel)
+	push	hl		;76
+	in	a,(0A8h)	;77
+	push	af		;79
+	and	c		;7A
+	or	b		;7B
+	exx			;7C
+	jp	0F38Ch		;7D
+sscret:	ex	af,af'		;80
+	pop	af		;81
+	ld	(0FFFFh),a	;82
+	ex	af,af'		;85
+	ret			;86
+;
+.395:	call	S64C7		;87 (rel)
+	jp	z,.397		;8A (rel)
+	call	PutSSLOT	;8D (rel)
+	push	af		;90
+	pop	iy		;91
+	push	hl		;93
+	push	bc		;94
+	ld	c,a		;95
+	ld	b,0		;96
+	ld	a,l		;98
+	and	h		;99
+	or	d		;9A
+	ld	hl,0FCC5h	;9B
+	add	hl,bc		;9E
+	ld	(hl),a		;9F
+	push	hl		;A0
+	ex	af,af'		;A1
+	exx			;A2
+	call	S640B		;A3 (rel)
+	exx			;A6
+	ex	af,af'		;A7
+	pop	hl		;A8
+	pop	bc		;A9
+	pop	de		;AA
+	ld	a,b		;AB
+	and	3Fh		;AC
+	or	c		;AE
+	di			;AF
+	call	4Bh		;B0
+	ld	(hl),e		;B3
+	ex	af,af'		;B4
+	exx			;B5
+	ret			;B6
+;WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 24 (select slot sub)
+.400:	call	GetSlotMasks	;B7 (rel)
+	jp	m,.398		;BA (rel)
+SetPSLOT:
+	in	a,(0A8h)	;BD
+	and	c		;BF
+	or	b		;C0
+	out	(0A8h),a	;C1
+	ret			;C3
+;
+.398:	call	S64C7		;C4 (rel)
+	jp	z,S64F7		;C7 (rel)
+SetSSLOT:
+	push	hl		;CA
+	call	PutSSLOT	;CB (rel)
+	ld	c,a		;CE
+	ld	b,0		;CF
+	ld	a,l		;D1
+	and	h		;D2
+	or	d		;D3
+	ld	hl,0FCC5h	;D4
+	add	hl,bc		;D7
+	ld	(hl),a		;D8
+	pop	hl		;D9
+	ld	a,c		;DA
+	jr	.400		;DB
+;
+GetSlotMasks:
+	di			;DD
+	push	af		;DE
+	ld	a,h		;DF
+	rlca			;E0
+	rlca			;E1
+	and	3		;E2
+	ld	e,a		;E4
+	inc	e		;E5
+	ld	a,0C0h		;E6
+.401:	rlca			;E8
+	rlca			;E9
+	dec	e		;EA
+	jr	nz,.401		;EB
+	ld	e,a		;ED
+	cpl			;EE
+	ld	c,a		;EF
+	pop	af		;F0
+	push	af		;F1
+	and	3		;F2
+	ld	b,a		;F4
+	inc	b		;F5
+	ld	a,0ABh		;F6
+.402:	add	a,55h		;F8
+	djnz	.402		;FA
+	ld	d,a		;FC
+	and	e		;FD
+	ld	b,a		;FE
+	pop	af		;FF
+	and	a		;100
+	ret			;101
+;
+PutSSLOT:
+	push	af		;102
+	ld	a,d		;103
+	and	0C0h		;104
+	ld	c,a		;106
+	pop	af		;107
+	push	af		;108
+	ld	d,a		;109
+	in	a,(0A8h)	;10A
+	ld	b,a		;10C
+	and	3Fh		;10D
+	or	c		;10F
+	push	af		;110
+	ld	a,d		;111
+	rrca			;112
+	rrca			;113
+	and	3		;114
+	ld	d,a		;116
+	inc	d		;117
+	ld	a,0ABh		;118
+.403:	add	a,55h		;11A
+	dec	d		;11C
+	jr	nz,.403		;11D
+	and	e		;11F
+	ld	d,a		;120
+	ld	a,e		;121
+	cpl			;122
+	ld	h,a		;123
+	pop	af		;124
+	call	SwitchSSLOT	;125 (rel), conv/3B
+	pop	af		;128
+	and	3		;129
+	ret			;12B
+;
+S64C7:	ld	c,a		;12C
+	ld	a,e		;12D
+	cp	3		;12E
+	ld	a,c		;130
+	ret	nz		;131
+	ld	a,(0F341h)	;132
+	and	e		;135
+	cp	b		;136
+	ld	a,c		;137
+	ret			;138
+;
+.390:	call	S64FF		;139 (rel)
+	ld	e,(hl)		;13C
+	jr	S64DF		;13D
+;
+.394:	pop	de		;13F
+	call	S64FF		;140 (rel)
+	ld	(hl),e		;143
+S64DF:	ld	a,b		;144
+	jr	.405		;145
+;
+.397:	call	S64F7		;147 (rel)
+	push	hl		;14A
+	push	bc		;14B
+	ex	af,af'		;14C
+	exx			;14D
+	call	0F398h		;14E
+	exx			;151
+	ex	af,af'		;152
+	pop	bc		;153
+	call	S64DF		;154 (rel)
+	pop	hl		;157
+	ld	(hl),b		;158
+	ex	af,af'		;159
+	exx			;15A
+	ret			;15B
+;
+S64F7:	call	S64FF		;15C (rel)
+	ld	hl,0FCC5h	;15F
+	ld	(hl),d		;162
+	ret			;163
+;
+S64FF:	rrca			;164
+	rrca			;165
+	and	3		;166
+	ld	d,a		;168
+	ld	a,(0FFFFh)	;169
+	cpl			;16C
+	ld	b,a		;16D
+	and	0FCh		;16E
+	or	d		;170
+	ld	d,a		;171
+.405:	ld	(0FFFFh),a	;172
+	ld	a,e		;175
+	ret			;176 // 177
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Moved to lower memory (3B??)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SwitchSSLOT:
+	out	(0A8h),a        ;3B
+	ld	a,(0FFFFh)	;3D
+	cpl			;40
+	ld	l,a		;41
+	and	h		;42
+	or	d		;43
+	jr	.407		;44
+	out	(0A8h),a	;46
+	ld	a,l		;48
+	jr	.407		;49
+	out	(0A8h),a	;4B
+	ld	a,e		;4D
+.407:	ld	(0FFFFh),a	;4E
+	ld	a,b		;51
+	out	(0A8h),a	;52
+	ret			;54 // 55 - 3B = 1A
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC CALL (_FORMAT etc)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BasicCallHandler:
+	ei
+	ld	a,(0FE4Eh)
+	cp	0C9h
+	scf
+	ret	z
+	push	hl
+	call	402Dh
+	ld	hl,0F348h
+	cp	(hl)
+	jr	nz,.408
+	ld	hl,$CallTab
+.411:
+	ld	de,0FD89h
+.410:
+	ld	a,(de)
+	cp	(hl)
+	jr	nz,.409
+	inc	de
+	inc	hl
+	and	a
+	jr	nz,.410
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	ex	(sp),hl
+	call	CHRGTR
+	scf
+	ccf
+	ret
+.409:
+	ld	a,(hl)
+	and	a
+	inc	hl
+	jr	nz,.409
+	inc	hl
+	inc	hl
+	ld	a,(hl)
+	and	a
+	jr	nz,.411
+.408:	pop	hl
+	scf
+	ret
+;
+$CallTab:
+	db	'SYSTEM',0
+	dw	call_system
+	db	'FORMAT',0
+	dw	call_format
+	db	'PARK',0
+	dw	call_park
+	db	0
+
+
+
+call_system:
+	ret	nz
+	ld	a,(0F346h)
+	and	a
+	jp	z,.521
+	ld	ix,6C1Ch
+	call	BasicCall
+	call	0D2h
+	call	0CCh
+	jp	.413
+
+
+call_format:
+	push	hl
+	call	z,HDD_CondFormat
+	pop	hl
+	and	a
+	ret
+GetDevNo:
+	ld	a,d
+DevCode:
+	dec	a
+	ret	p
+	ld	a,(0F247h)
+	ret
+MakeFCB:
+	push	hl
+	push	de
+	push	bc
+	call	GetDevNo
+	ld	c,a
+	ld	hl,(0F860h)
+	ld	a,(0F85Fh)
+.418:
+	push	af
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	inc	hl
+	push	hl
+	ex	de,hl
+	ld	a,(hl)
+	and	a
+	jr	z,.414
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	a,(hl)
+	cp	9
+	jr	nc,.414
+	dec	hl
+	dec	hl
+	ld	d,(hl)
+	dec	hl
+	ld	e,(hl)
+	ld	a,(de)
+	call	DevCode
+	cp	c
+	jr	nz,.414
+	inc	de
+	ex	de,hl
+	ld	de,0F866h
+	ld	b,0Bh
+.416:
+	ld	a,(de)
+	cp	'?'
+	jr	z,.415
+	cp	(hl)
+	jr	nz,.414
+.415:
+	inc	de
+	inc	hl
+	djnz	.416
+	pop	hl
+	pop	hl
+	jr	RetBDH
+.414:
+	pop	hl
+	pop	af
+	dec	a
+	jp	p,.418
+	jr	RetBDH
+SearchFile:
+	push	hl
+	push	de
+	push	bc
+	ld	a,d
+	ld	(0F568h),a
+	call	MoveFCB
+	call	FileFind
+	jr	RetBDH
+FileFind:
+	ld	hl,0F5B2h
+	ld	(0F23Dh),hl
+	ld	de,0F568h
+	xor	a
+	ld	(0F574h),a
+	call	BDOS_11
+	inc	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+MoveFCB:ld	de,0F569h
+MovFCBup:
+	ld	hl,0F866h
+	ld	bc,0Bh
+	ldir
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+InitBasFCB:
+	ei
+	push	hl
+	push	de
+	push	bc
+	push	af
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,10h
+	jr	nc,.421
+	ld	l,18h
+.421:
+	add	hl,sp
+	push	ix
+	pop	bc
+	ld	(hl),c
+	inc	hl
+	ld	(hl),b
+	ld	hl,0Ah
+	add	hl,sp
+	ex	de,hl
+	jr	.422
+.425:
+	push	iy
+	pop	bc
+.423:
+	ld	c,(hl)
+	ld	a,(de)
+	ld	(hl),a
+	ld	a,c
+	ld	(de),a
+	inc	hl
+	inc	de
+	djnz	.423
+.422:
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,12h
+	jr	nc,.424
+	ld	l,1Ah
+.424:	add	hl,sp
+	ld	a,e
+	sub	l
+	ld	a,d
+	sbc	a,h
+	jr	c,.425
+RetABDH:pop	af
+RetBDH:	pop	bc
+	pop	de
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hGetPointer:
+	ld	ix,0F38Bh
+	ld	iy,0200h
+	call	InitBasFCB
+	pop	hl
+	ld	a,(hl)
+	and	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hNoFor:	ei
+	ld	bc,0100h
+	ld	(0F33Dh),bc
+	call	CHRGTR
+	ld	a,e
+	ret	z
+	push	af
+	push	hl
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,0Ch
+	jr	nc,.426
+	ld	l,14h
+.426:
+	add	hl,sp
+	ld	a,(hl)
+	cp	4
+	jp	nz,.427
+	inc	hl
+	ld	a,(hl)
+	cp	9
+	jp	nc,.427
+	pop	hl
+	call	SYNCHR
+	db	0FFh
+	call	SYNCHR
+	db	92h
+	call	SYNCHR
+	db	0EFh
+	ld	ix,4756h
+	call	BasicCall
+	dec	de
+	inc	d
+	dec	d
+	jp	nz,.521
+	inc	de
+	ld	(0F33Dh),de
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hNullOpen:
+	ei
+	ret	nc
+	ld	ix,0F38Bh
+	ld	iy,0400h
+	call	InitBasFCB
+	call	S6F65
+	call	MakeFCB
+	jp	z,.428
+	ld	(0F864h),hl
+	ld	a,e
+	cp	4
+	jr	z,.429
+	ld	bc,1
+	ld	(0F33Dh),bc
+.429:
+	pop	af
+	push	af
+	push	hl
+	push	de
+	ld	hl,0F345h
+	cp	(hl)
+	jp	nc,.430
+	ld	bc,25h
+	ld	e,a
+	ld	d,b
+	ld	hl,(0F353h)
+	call	Mul32
+	xor	a
+	ld	hl,0Ch
+	add	hl,bc
+	ld	(hl),a
+	pop	de
+	pop	hl
+	inc	hl
+	ld	(hl),c
+	inc	hl
+	ld	(hl),b
+	inc	hl
+	ld	(hl),a
+	inc	hl
+	ld	(hl),d
+	inc	hl
+	inc	hl
+	ld	(hl),a
+	call	SearchFile
+	push	bc
+	push	de
+	ld	a,d
+	ld	(bc),a
+	ld	e,c
+	ld	d,b
+	inc	de
+	call	MovFCBup
+	pop	de
+	pop	bc
+	ld	a,e
+	jr	nz,.431
+	and	86h
+	jp	z,.432
+.435:
+	push	de
+	push	bc
+	ld	e,c
+	ld	d,b
+	call	BDOS_16
+	and	a
+	jp	nz,.433
+	pop	hl
+	call	FCBinitOPEN
+	pop	de
+	ld	hl,(0F864h)
+	ld	(hl),e
+.437:	pop	af
+	pop	hl
+	ret
+;
+.431:	cp	8
+	jr	z,.434
+	cp	2
+	jr	z,.435
+	cp	80h
+	jr	z,.435
+	push	de
+	push	bc
+	ld	e,c
+	ld	d,b
+	call	BDOS_0F
+	pop	hl
+	call	FCBinitOPEN
+	pop	de
+	ld	hl,(0F864h)
+	ld	(hl),e
+	ld	a,e
+	cp	4
+	jr	z,.437
+	push	hl
+	ld	hl,0FCAEh
+	xor	a
+	cp	(hl)
+	ld	(hl),a
+	pop	hl
+	jr	nz,.437
+	ld	bc,6
+	add	hl,bc
+	push	hl
+	ld	(hl),0FFh
+	ld	hl,(0F864h)
+	call	ReadCharacter
+	pop	hl
+	dec	hl
+	dec	hl
+	dec	hl
+	ld	(hl),a
+	cp	0FFh
+	jr	nz,.437
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),80h
+.441:	jr	.437
+;
+.434:	push	bc
+	ld	e,c
+	ld	d,b
+	call	BDOS_0F
+	pop	hl
+	push	hl
+	call	FCBinitOPEN
+	ld	hl,(0F864h)
+	ld	(hl),1
+	ld	bc,6
+	add	hl,bc
+	ld	(hl),0FFh
+	ld	hl,(0F864h)
+.438:	push	hl
+	call	ReadCharacter
+	pop	hl
+	jr	nc,.438
+	ld	(hl),2
+	pop	hl
+	ld	bc,21h
+	add	hl,bc
+	ld	c,4
+	push	hl
+	scf
+.439:	ld	a,(hl)
+	sbc	a,b
+	ld	(hl),a
+	inc	hl
+	dec	c
+	jr	nz,.439
+	pop	hl
+	inc	c
+	jr	nc,.440
+	ld	c,4
+.440:	call	S67CF
+	jr	.441
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+FCBinitOPEN:
+	ld	bc,0Ch
+	add	hl,bc
+	ld	(hl),b
+	inc	hl
+	ld	(hl),b
+	inc	hl
+	ld	bc,(0F33Dh)
+	ld	(hl),c
+	inc	hl
+	ld	(hl),b
+	ld	bc,11h
+	add	hl,bc
+	ld	c,5
+S67CF:	ld	(hl),b
+	inc	hl
+	dec	c
+	jr	nz,S67CF
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hInpDiskChar:
+	ld	ix,0F38Bh
+	ld	iy,0600h
+	call	InitBasFCB
+	call	ReadCharacter
+	jp	RetBDH
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ReadCharacter:
+	push	hl
+	ld	a,(hl)
+	cp	1
+	jp	nz,.443
+	ld	e,l
+	ld	d,h
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	a,(hl)
+	and	a
+	jr	nz,.444
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	(hl)
+	ld	a,(hl)
+	inc	hl
+	inc	hl
+	inc	hl
+	jr	nz,.445
+	push	hl
+	ld	(0F23Dh),hl
+	ex	de,hl
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ld	hl,0100h
+	call	BDOS_27
+	ld	e,l
+	ld	d,h
+	dec	h
+	ld	a,l
+	or	h
+	pop	hl
+	jr	z,.445
+	push	hl
+	add	hl,de
+	ld	(hl),1Ah
+	pop	hl
+	xor	a
+.445:
+	ld	c,a
+	ld	b,0
+	add	hl,bc
+	ld	a,(hl)
+.444:
+	ld	b,a
+	sub	1Ah
+	sub	1
+	ld	a,b
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),0
+	ret	nc
+	ld	(hl),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hBackUp:ei
+	push	hl
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,8
+	jr	nc,.446
+	ld	l,10h
+.446:	add	hl,sp
+	ld	(hl),41h
+	inc	hl
+	ld	(hl),6Eh
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),c
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hFileOut1:
+	ld	ix,0F38Bh
+	ld	iy,0800h
+	call	InitBasFCB
+	ld	a,(hl)
+	cp	2
+	jp	nz,.443
+	pop	af
+	push	af
+	call	FilePutChar
+	jp	RetABDH
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+FilePutChar:
+	push	hl
+	ld	bc,6
+	add	hl,bc
+	ld	c,(hl)
+	inc	(hl)
+	inc	hl
+	inc	hl
+	inc	hl
+	add	hl,bc
+	ld	(hl),a
+	pop	hl
+	ret	nz
+S6871:	push	hl
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ld	bc,4
+	add	hl,bc
+	ld	a,(hl)
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(0F23Dh),hl
+	and	a
+	ld	l,a
+	ld	h,b
+	jr	nz,.448
+	inc	h
+.448:	call	WriteFileBuf
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hNotFile0:
+	ld	ix,0F38Bh
+	ld	iy,0400h
+	call	InitBasFCB
+	pop	hl
+	ld	a,(hl)
+	sub	2
+	jr	nz,.449
+	push	hl
+	ld	hl,0FCAEh
+	cp	(hl)
+	ld	(hl),a
+	pop	hl
+	jr	nz,.449
+	ld	(hl),4
+	ld	a,1Ah
+	call	FilePutChar
+	call	nz,S6871
+.449:	push	hl
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	call	BDOS_10
+	pop	hl
+	push	hl
+	ld	de,7
+	add	hl,de
+	ld	(hl),d
+	ld	l,d
+	ld	h,d
+	ld	(0F864h),hl
+	pop	hl
+	inc	(hl)
+	dec	(hl)
+	ld	(hl),d
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hBinSave:
+	call	RetModify
+	push	hl
+	ld	ix,54F7h
+	call	BasicCall
+	ld	a,0FFh
+	call	WrByt1
+	ld	hl,(0F676h)
+	ld	(0F23Dh),hl
+	ex	de,hl
+	ld	hl,(0F6C2h)
+	and	a
+	sbc	hl,de
+	call	WrBloadBuf
+	ld	(0F87Ch),a
+	pop	hl
+	ld	ix,6B24h
+	jp	BasicCall
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hBinLoad:
+	ld	ix,739Ah
+	ld	iy,0200h
+	call	InitBasFCB
+	pop	af
+	jp	z,.443
+	ld	ix,6C1Ch
+	call	BasicCall
+	ld	hl,(0F353h)
+	push	hl
+	call	FCBinitOPEN
+	pop	hl
+	push	hl
+	ld	bc,13h
+	add	hl,bc
+	ld	a,(hl)
+	and	a
+	jp	nz,.450
+	dec	hl
+	or	(hl)
+	jp	nz,.450
+	dec	hl
+	ld	d,(hl)
+	dec	hl
+	ld	e,(hl)
+	ld	hl,(0F676h)
+	add	hl,de
+	jp	c,.450
+	ld	bc,93h
+	add	hl,bc
+	jp	c,.450
+	sbc	hl,sp
+	jp	nc,.450
+	ex	de,hl
+	ex	(sp),hl
+	ex	de,hl
+	call	RdOneByte
+	ld	hl,(0F676h)
+	ld	(0F23Dh),hl
+	pop	hl
+	dec	hl
+	call	BDOS_27
+	ld	de,(0F676h)
+	add	hl,de
+	ld	(0F6C2h),hl
+	ld	ix,4253h
+	call	BasicCall
+	ld	a,(0F866h)
+	and	a
+	ret	nz
+	ld	(0F87Ch),a
+	ld	hl,T6975
+	ld	de,0F568h
+	ld	bc,5
+	push	de
+	ldir
+	pop	hl
+	ld	ix,4601h
+	jp	BasicCall
+;
+T6975:	db	':',92h,0,0,0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Write16bit:
+	push	hl
+	ld	a,l
+	call	WrOneByte
+	pop	hl
+	ld	a,h
+	jr	WrOneByte
+;
+WrByt1:	ld	de,(0F353h)
+WrOneByte:
+	ld	bc,BDOS_26
+	jr	.451
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+RdOneByte:
+	ld	bc,BDOS_27
+.451:	push	af
+	ld	hl,1
+	add	hl,sp
+	ld	(0F23Dh),hl
+	push	de
+	call	OneBlock
+	pop	de
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Read/write one block
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+OneBlock:
+	ld	hl,1
+	push	bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC: BSAVE handler
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BSAVE_HND:
+	push	de
+	call	ScanBasInt
+	ld	(0FCBFh),de
+	push	de
+	call	ScanBasInt
+	ld	(0F87Dh),de
+	ex	(sp),hl
+	ex	de,hl
+	rst	20h
+	jp	c,.521
+	ex	de,hl
+	ex	(sp),hl
+	call	CHRGTR
+	db	'7'
+	jr	z,.454
+	call	SYNCHR
+	db	','
+	cp	'S'
+	jr	nz,.453
+	call	BASCHR
+	and	a
+	jr	.454
+;
+.453:	call	GetBasNumb
+	ld	(0FCBFh),de
+	scf
+.454:	pop	bc
+	jr	nc,.455
+	inc	b
+	dec	b
+	jp	p,.521
+.455:	pop	de
+	push	hl
+	push	bc
+	push	af
+	xor	a
+	ld	e,2
+	ld	ix,6AFAh
+	call	BasicCall
+	ld	a,0FEh
+	call	WrByt1
+	pop	af
+	pop	hl
+	push	hl
+	push	af
+	call	Write16bit
+	ld	hl,(0F87Dh)
+	call	Write16bit
+	ld	hl,(0FCBFh)
+	call	Write16bit
+	pop	af
+	pop	bc
+	push	af
+	ld	(0F23Dh),bc
+	ld	hl,(0F87Dh)
+	and	a
+	sbc	hl,bc
+	inc	hl
+	pop	af
+	jr	nc,.456
+	call	WrBloadBuf
+.460:	ld	a,0FFh
+	ld	(0FCAEh),a
+	xor	a
+	ld	ix,6B24h
+	call	BasicCall
+	jp	.474
+;
+.456:	call	S7121
+.459:	push	hl
+	ld	de,(0FCBFh)
+	rst	20h
+	push	af
+	ld	c,l
+	ld	b,h
+	ld	hl,(0F87Dh)
+	push	hl
+	add	hl,bc
+	ld	(0F87Dh),hl
+	pop	hl
+	ld	de,(0F23Dh)
+	call	59h
+	pop	af
+	jr	nc,.458
+	pop	hl
+	push	hl
+	call	WrBloadBuf
+	ld	hl,(0FCBFh)
+	pop	de
+	and	a
+	sbc	hl,de
+	ld	(0FCBFh),hl
+	ex	de,hl
+	jr	.459
+;
+.458:	pop	hl
+	ld	hl,(0FCBFh)
+	call	WrBloadBuf
+	jr	.460
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC: BLOAD handler
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BLOAD_HND:
+	push	de
+	xor	a
+	ld	(0FCBEh),a
+	ld	c,a
+	ld	b,a
+	call	CHRGTR
+	jr	z,.461
+	call	SYNCHR
+	db	','
+	cp	'R'
+	jr	z,.462
+	cp	'S'
+	jr	nz,.463
+.462:	ld	(0FCBEh),a
+	call	BASCHR
+	jr	z,.461
+	call	SYNCHR
+	db	','
+.463:	call	GetBasNumb
+	ld	b,d
+	ld	c,e
+.461:	pop	de
+	push	hl
+	push	bc
+	ld	a,0FFh
+	ld	(0FCAEh),a
+	xor	a
+	ld	e,1
+	ld	ix,6AFAh
+	call	BasicCall
+	ld	de,(0F353h)
+	call	RdOneByte
+	cp	0FEh
+	jp	nz,.443
+	pop	bc
+	call	ReadWord
+	push	hl
+	call	ReadWord
+	push	hl
+	call	ReadWord
+	ld	(0FCBFh),hl
+	pop	hl
+	pop	bc
+	and	a
+	sbc	hl,bc
+	inc	hl
+	ld	(0F23Dh),bc
+	ld	a,(0FCBEh)
+	cp	'S'
+	jr	z,.464
+	call	BDOS_27
+.467:	ld	ix,4AFFh
+	call	BasicCall
+	pop	hl
+	ret
+;
+.464:	call	S7121
+.466:	push	hl
+	ld	de,(0FCBFh)
+	rst	20h
+	push	af
+	ld	de,(0F353h)
+	call	BDOS_27
+	pop	af
+	pop	bc
+	push	bc
+	push	af
+	ld	hl,(0F87Dh)
+	push	hl
+	add	hl,bc
+	ld	(0F87Dh),hl
+	pop	de
+	ld	hl,(0F23Dh)
+	pop	af
+	jr	nc,.465
+	call	5Ch
+	ld	hl,(0FCBFh)
+	pop	de
+	and	a
+	sbc	hl,de
+	ld	(0FCBFh),hl
+	ex	de,hl
+	jr	.466
+;
+.465:	pop	bc
+	ld	bc,(0FCBFh)
+	call	5Ch
+	xor	a
+	ld	(0FCBEh),a
+	jr	.467
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ReadWord:
+	push	bc
+	call	RdOneByte
+	push	af
+	call	RdOneByte
+	ld	h,a
+	pop	af
+	ld	l,a
+	pop	bc
+	add	hl,bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ScanBasInt:
+	call	SYNCHR
+	db	','
+GetBasNumb:
+	ld	ix,6F0Bh
+	jp	BasicCall
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Sector input
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_DSKI$:	call	RetModify
+	call	BASCHR
+	call	SYNCHR
+	db	'('
+	call	SecParms
+	call	SYNCHR
+	db	')'
+	push	hl
+	ld	hl,3FD6h
+	ld	(0F7F8h),hl
+	pop	hl
+	ld	a,3
+	ld	(0F663h),a
+	and	a
+	jr	dsk@$
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Sector output
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_DSKO$:	call	RetModify
+	call	SecParms
+	call	CHRGTR
+	ret	nz
+	scf
+dsk@$:	push	af
+	push	hl
+	push	de
+	ld	e,c
+	call	BDOS_1B
+	inc	a
+	jp	z,e$badd
+	pop	de
+	pop	hl
+	pop	af
+	push	hl
+	ld	a,0FFh
+	ld	(0F246h),a
+	ld	a,(ix)
+	ld	b,1
+	ld	c,(ix+1)
+	ld	hl,(0F351h)
+	call	0144h
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get sector parametres
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SecParms:
+	ld	ix,521Ch
+	call	BasicCall
+	push	de
+	call	SYNCHR
+	db	','
+	ld	ix,542Fh
+	call	BasicCall
+	pop	bc
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get information from disk
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hDiskGET:
+	ld	ix,0F38Bh
+	ld	iy,0400h
+	call	InitBasFCB
+	ld	a,(hl)
+	cp	4
+	jp	nz,.443
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ld	bc,7
+	add	hl,bc
+	ex	(sp),hl
+	call	CHRGTR
+	jr	z,.471
+	push	de
+	call	SYNCHR
+	db	','
+	ld	ix,4C64h
+	call	BasicCall
+	push	hl
+	call	LI2DBL
+	ld	a,c
+	or	b
+	or	l
+	or	h
+	jp	z,.521
+	ld	a,c
+	or	b
+	dec	bc
+	jr	nz,.472
+	dec	hl
+.472:	ex	de,hl
+	pop	hl
+	ex	(sp),hl
+	push	hl
+	push	de
+	ld	de,21h
+	add	hl,de
+	pop	de
+	ld	(hl),c
+	inc	hl
+	ld	(hl),b
+	inc	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	pop	de
+	pop	hl
+.471:	ex	(sp),hl
+	ld	(0F23Dh),hl
+	pop	hl
+	pop	af
+	push	hl
+	and	a
+	ld	hl,T72B9
+	ld	bc,BDOS_27
+	jr	z,.473
+	ld	hl,.527
+	ld	bc,BDOS_26
+.473:	push	hl
+	call	OneBlock
+	and	a
+	ret	nz
+	pop	hl
+	jp	.474
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC: FIELD operator
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_FIELD:	call	RetModify
+	cp	'#'
+	call	z,BASCHR
+	ld	ix,521Ch
+	call	BasicCall
+	jp	z,.427
+	push	hl
+	ld	ix,6A6Dh
+	call	BasicCall
+	ld	e,l
+	ld	d,h
+	jp	z,.475
+	jp	c,.521
+	ld	a,(hl)
+	cp	4
+	jp	nz,.443
+	inc	hl
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	ld	bc,0Eh
+	add	hl,bc
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
+	ld	(0F568h),bc
+	ld	hl,0
+	ld	(0F56Ah),hl
+	ld	bc,9
+	pop	hl
+.478:	ex	de,hl
+	add	hl,bc
+	ex	de,hl
+	ld	a,(hl)
+	cp	','
+	ret	nz
+	push	de
+	ld	ix,521Bh
+	call	BasicCall
+	push	af
+	call	SYNCHR
+	db	'A'
+	call	SYNCHR
+	db	'S'
+	ld	ix,5EA4h
+	call	BasicCall
+	ld	ix,5597h
+	call	BasicCall
+	jp	nz,.476
+	pop	af
+	ex	(sp),hl
+	push	de
+	push	hl
+	ld	hl,(0F56Ah)
+	ld	c,a
+	ld	b,0
+	add	hl,bc
+	ld	(0F56Ah),hl
+	ex	de,hl
+	ld	hl,(0F568h)
+	rst	20h
+	jp	c,.477
+	pop	de
+	pop	hl
+	ld	(hl),c
+	inc	hl
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+	ld	b,0
+	pop	hl
+	jr	.478
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Assigment w/padding
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_RSET:	db	0F6h		;OR <d> opcode
+_LSET:	scf
+	call	RetModify
+	push	af
+	ld	ix,5EA4h
+	call	BasicCall
+	ld	ix,5597h
+	call	BasicCall
+	jp	nz,.476
+	push	de
+	ld	ix,4C5Fh
+	call	BasicCall
+	pop	bc
+	ex	(sp),hl
+	push	hl
+	push	bc
+	ld	ix,67D0h
+	call	BasicCall
+	ld	b,(hl)
+	ex	(sp),hl
+	ld	a,(hl)
+	ld	c,a
+	push	bc
+	push	hl
+	push	af
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	or	a
+	jr	z,.479
+	ld	hl,(0F862h)
+	dec	hl
+	rst	20h
+	jr	c,.480
+	ld	hl,(0F6C2h)
+	rst	20h
+	jr	c,.480
+	ld	e,c
+	ld	d,0
+	ld	hl,(0F674h)
+	add	hl,de
+	ex	de,hl
+	ld	hl,(0F69Bh)
+	rst	20h
+	jr	c,.481
+	pop	af
+.487:	ld	a,c
+	ld	ix,668Eh
+	call	BasicCall
+	pop	hl
+	pop	bc
+	ex	(sp),hl
+	push	de
+	push	bc
+	ld	ix,67D0h
+	call	BasicCall
+	pop	bc
+	pop	de
+	ex	(sp),hl
+	push	bc
+	push	hl
+	inc	hl
+	push	af
+	ld	(hl),e
+	inc	hl
+	ld	(hl),d
+.480:	pop	af
+	pop	hl
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	pop	bc
+	pop	hl
+	inc	hl
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	ld	a,c
+	cp	b
+	jr	nc,.482
+	ld	b,a
+.482:	sub	b
+	ld	c,a
+	pop	af
+	call	nc,PadSP
+	inc	b
+.484:	dec	b
+	jr	z,.483
+	ld	a,(hl)
+	ld	(de),a
+	inc	hl
+	inc	de
+	jr	.484
+;
+.479:	pop	bc
+	pop	bc
+	pop	bc
+	pop	bc
+	pop	bc
+.483:	call	c,PadSP
+	pop	hl
+	ret
+;
+PadSP:	ld	a,' '
+	inc	c
+.485:	dec	c
+	ret	z
+	ld	(de),a
+	inc	de
+	jr	.485
+;
+.481:	pop	af
+	pop	hl
+	pop	bc
+	ex	(sp),hl
+	ex	de,hl
+	jr	nz,.486
+	push	bc
+	ld	a,b
+	ld	ix,6627h
+	call	BasicCall
+	ld	de,0F698h
+	ld	hl,(0F678h)
+	ld	(0F7F8h),hl
+	ld	a,3
+	ld	(0F663h),a
+	call	2EF3h
+	ld	de,0F69Bh
+	rst	20h
+	ld	(0F678h),hl
+	jp	z,.368
+	pop	bc
+.486:	ex	(sp),hl
+	push	bc
+	push	hl
+	jp	.487
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	MKI, MKS, MKD functions
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_MKI$:	ld	a,2
+	db	1
+_MKS$:	ld	a,4
+	db	1
+_MKD$:	ld	a,8
+	call	RetModify
+	push	af
+	ld	ix,517Ah
+	call	BasicCall
+	pop	af
+	ld	ix,6627h
+	call	BasicCall
+	ld	hl,(0F699h)
+	call	2F10h
+	jp	.488
+	db	0,0,0,0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	CVI, CVS, CVD functions
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_CVI:	ld	a,1
+	db	1
+_CVS:	ld	a,3
+	db	1
+_CVD:	ld	a,7
+	call	RetModify
+	push	af
+	ld	ix,67D0h
+	call	BasicCall
+	pop	af
+	cp	(hl)
+	jp	nc,.521
+	inc	a
+	inc	hl
+	ld	c,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,c
+	ld	(0F663h),a
+	jp	2F08h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Convert long int to DBL
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+LI2DBL:	ld	ix,5597h
+	call	BasicCall
+	ld	bc,(0F7F8h)
+	ld	hl,0
+	ret	m
+	jp	z,.476
+	ld	hl,0F7F6h
+	ld	de,0F5FCh
+	ld	bc,8
+	ldir
+	ld	hl,$65536
+	ld	de,0F847h
+	ld	c,8
+	ldir
+	call	289Fh
+	and	a
+	call	30D1h
+	ld	ix,5432h
+	call	BasicCall
+	push	de
+	ex	de,hl
+	ld	ix,46FFh
+	call	BasicCall
+	call	3042h
+	ld	bc,6545h
+	ld	de,6053h
+	call	325Ch
+	ld	hl,0F7F6h
+	ld	de,0F847h
+	ld	bc,8
+	ldir
+	ld	hl,0F5FCh
+	ld	de,0F7F6h
+	ld	c,8
+	ldir
+	call	268Ch
+	ld	ix,5432h
+	call	BasicCall
+	ld	c,e
+	ld	b,d
+	pop	hl
+	ret
+;
+$65536:	db	45h,65h,53h,60h,00h,00h,00h,00h
+;
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	EOF() function
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_EOF:	call	RetModify
+	push	hl
+	call	ReadCharacter
+	ld	hl,0
+	jr	nc,.490
+	dec	hl
+.490:	push	af
+	call	2F99h
+	pop	af
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_FILES:	call	RetModify
+	ld	d,0
+	jr	z,.491
+	call	ChekEmptyFCB
+	push	hl
+	jr	.492
+.491:	push	hl
+	call	AllFiles
+.492:	call	set_fcb_d
+	ld	a,(0F416h)
+	and	a
+	push	af
+	call	FileFind
+	jp	z,.432
+	ld	ix,7323h
+	call	BasicCall
+.499:	ld	hl,0F5B3h
+	ld	b,0Bh
+.495:	ld	a,(hl)
+	inc	hl
+	rst	18h
+	ld	a,b
+	cp	4
+	jr	nz,.493
+	ld	a,(hl)
+	cp	' '
+	jr	z,.494
+	ld	a,'.'
+.494:	rst	18h
+.493:	djnz	.495
+	call	0BDh
+	pop	af
+	push	af
+	ld	a,(0F3B0h)
+	ld	b,a
+	ld	a,(0F661h)
+	jr	z,.496
+	ld	b,80
+	ld	a,(0F415h)
+.496:	and	a
+	jr	z,.497
+	add	a,0Ch
+	cp	b
+	jr	nc,.498
+	ld	a,' '
+	rst	18h
+.498:	ld	ix,7328h
+	call	nc,BasicCall
+.497:	ld	de,0F568h
+	xor	a
+	ld	(0F574h),a
+	call	BDOS_12
+	inc	a
+	jr	nz,.499
+	pop	af
+.474:	pop	hl
+	ld	ix,4AFFh
+	jp	BasicCall
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_KILL:	call	RetModify
+	call	SetupFCB
+	call	CHRGTR
+	ret	nz
+	call	MakeFCB
+	jp	z,.500
+	call	set_fcb_d
+	push	hl
+	ld	de,0F568h
+	call	BDOS_13
+	and	a
+	jp	nz,.432
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC: rename handler (NAME)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_RENAME:call	RetModify
+	call	SetupFCB
+	call	MakeFCB
+	jp	z,.500
+	call	set_fcb_d
+	push	hl
+	call	FileFind
+	jp	z,.432
+	pop	hl
+	call	SYNCHR
+	db	'A'
+	call	SYNCHR
+	db	'S'
+	call	SetupFCB
+	ld	a,d
+	ld	(0F578h),a
+	push	hl
+	ld	hl,(0F568h)
+	and	a
+	jr	z,.501
+	cp	l
+	jp	nz,.502
+.501:	ld	de,0F579h
+	call	MovFCBup
+	ld	de,0F568h
+	call	BDOS_17
+	and	a
+	jp	nz,.503
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Set drive code in FCB
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+set_fcb_d:
+	call	GetDevNo
+	inc	a
+	ld	(0F568h),a
+	push	hl
+	push	de
+	call	MoveFCB
+	pop	de
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetFCBDriveNo:
+	ld	ix,6A0Eh
+	call	BasicCall
+	ld	a,d
+	cp	9
+	ret	c
+	jp	e$badd
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Convert "" to "*.*"
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ChekEmptyFCB:
+	call	GetFCBDriveNo
+	push	hl
+	ld	hl,0F866h
+	ld	b,0Bh
+.506:	ld	a,(hl)
+	inc	hl
+	cp	' '
+	jr	nz,.507
+	djnz	.506
+	call	AllFiles
+	jr	.507
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Setup FCB for basic
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetupFCB:
+	call	GetFCBDriveNo
+	push	hl
+.507:	ld	hl,0F866h
+	ld	b,8
+	call	GetFCBpart
+	ld	b,3
+	call	GetFCBpart
+	pop	hl
+	db	0F6h
+S6F65:	scf
+	push	de
+	push	hl
+	ld	de,0F866h
+	push	de
+	ld	b,0Bh
+.510:	push	bc
+	ld	a,(de)
+	ld	hl,$f_delim
+	ld	bc,0Dh
+	jr	c,.508
+	dec	bc
+.508:	cpir
+	jr	z,.509
+	pop	bc
+	inc	de
+	djnz	.510
+	pop	hl
+	call	S6F95
+	pop	hl
+	pop	de
+	ret
+;
+$f_delim:
+	db	'."/\[]:+=;,*?'
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+S6F95:	ld	a,' '
+	cp	(hl)
+	jr	z,.509
+	ld	b,7
+	call	Pad_HL
+	ld	b,3
+Pad_HL:	inc	hl
+	cp	(hl)
+	jr	z,.511
+	djnz	Pad_HL
+	ret
+;
+.511:	dec	b
+	ret	z
+	inc	hl
+	cp	(hl)
+	jr	z,.511
+.509:	jp	.512
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetFCBpart:
+	ld	a,(hl)
+	cp	'*'
+	jr	z,.513
+	inc	hl
+	djnz	GetFCBpart
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+AllFiles:
+	ld	hl,0F866h
+	ld	b,0Bh
+.513:	ld	(hl),'?'
+	inc	hl
+	djnz	.513
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_LOF:	ld	bc,10h
+	db	11h
+_LOC:	ld	bc,21h
+	call	RetModify
+	push	bc
+	ld	ix,521Fh
+	call	BasicCall
+	ld	ix,6A6Dh
+	call	BasicCall
+	jp	c,.521
+	jp	z,.475
+	pop	bc
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ex	de,hl
+	add	hl,bc
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
+	inc	hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ex	de,hl
+	push	bc
+	ld	ix,46FFh
+	call	BasicCall
+	ld	bc,6545h
+	ld	de,6053h
+	call	325Ch
+	ld	hl,0F7F6h
+	ld	de,0F847h
+	ld	bc,8
+	ldir
+	pop	hl
+	ld	ix,46FFh
+	call	BasicCall
+	call	3042h
+	jp	269Ah
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_DSKF:	call	RetModify
+	ld	ix,521Fh
+	call	BasicCall
+	ld	hl,0F347h
+	cp	(hl)
+	jr	z,.515
+	jp	nc,e$badd
+.515:	ld	e,a
+	call	BDOS_1B
+	jp	2F99h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC: COPY operator
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+_COPY:	call	RetModify
+	call	ChekEmptyFCB
+	call	MakeFCB
+	jp	z,.500
+	call	set_fcb_d
+	push	hl
+	ld	a,(0F247h)
+	inc	a
+	ld	(0F58Dh),a
+	ld	hl,0F569h
+	ld	de,0F58Eh
+	ld	bc,24h
+	ldir
+	pop	hl
+	call	CHRGTR
+	jr	z,.516
+	call	SYNCHR
+	db	0D9h
+	call	ChekEmptyFCB
+	call	MakeFCB
+	jp	z,.500
+	call	GetDevNo
+	inc	a
+	ld	(0F58Dh),a
+	push	hl
+	ld	de,0F58Eh
+	call	MovFCBup
+	pop	hl
+	call	CHRGTR
+	ret	nz
+.516:	push	hl
+	call	FileFind
+	jp	z,.432
+CopyLoop:
+	call	0BDh
+	ld	bc,0F58Dh
+	ld	de,0F5D7h
+	ld	hl,0F5B2h
+	ld	a,0Ch
+.518:	push	af
+	ld	a,(bc)
+	cp	'?'
+	jr	nz,.517
+	ld	a,(hl)
+.517:	ld	(de),a
+	inc	bc
+	inc	de
+	inc	hl
+	pop	af
+	dec	a
+	jr	nz,.518
+	ld	hl,0F5B2h
+	ld	de,0F5D7h
+	ld	b,0Ch
+.520:	ld	a,(de)
+	cp	(hl)
+	jr	nz,.519
+	inc	hl
+	inc	de
+	djnz	.520
+	jp	.521
+.519:	call	S7128
+	push	hl
+	xor	a
+	ld	(0F5BEh),a
+	ld	de,0F5B2h
+	call	BDOS_0F
+	ld	de,0F5D7h
+	call	BDOS_16
+	or	a
+	jp	nz,.433
+	ld	l,a
+	ld	h,a
+	ld	(0F5D3h),hl
+	ld	(0F5D5h),hl
+	ld	(0F5F8h),hl
+	ld	(0F5FAh),hl
+	inc	l
+	ld	(0F5C0h),hl
+	ld	(0F5E5h),hl
+	pop	hl
+.523:	push	hl
+	ld	de,0F5B2h
+	call	BDOS_27
+	ld	a,l
+	or	h
+	jr	z,.522
+	ld	de,0F5D7h
+	call	WriteFileBuf
+	pop	hl
+	jr	.523
+;
+.522:	pop	hl
+	ld	hl,(0F5C6h)
+	ld	(0F5EBh),hl
+	ld	hl,(0F5C8h)
+	ld	(0F5EDh),hl
+	ld	de,0F5D7h
+	call	BDOS_10
+	ld	hl,0F5B2h
+	ld	(0F23Dh),hl
+	ld	de,0F568h
+	xor	a
+	ld	(0F574h),a
+	call	BDOS_12
+	inc	a
+	jp	nz,CopyLoop
+	pop	hl
+	ret
+;
+S7121:	ld	(0FCBFh),hl
+	ld	(0F87Dh),bc
+S7128:	ld	hl,0FE00h
+	add	hl,sp
+	jr	nc,.525
+	ld	de,(0F6C6h)
+	and	a
+	sbc	hl,de
+	jr	c,.525
+	ld	a,h
+	and	a
+	jr	nz,.526
+.525:	ld	de,(0F862h)
+	ld	hl,0100h
+.526:	ld	(0F23Dh),de
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Write some buffer
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+WrBloadBuf:
+	ld	de,(0F353h)
+WriteFileBuf:
+	call	BDOS_26
+	and	a
+	ret	z
+	jr	.527
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Error generators
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+.548:	ld	e,3Ch	;Bad FAT
+	db	1
+.443:	ld	e,3Dh	;Bad file mode
+	db	1
+e$badd:	ld	e,3Eh	;Bad drive name
+	db	1
+.500:	ld	e,40h	;bad sector no
+	db	1
+.503:	ld	e,41h	;file open
+	db	1
+.527:	ld	e,42h	;file exists
+	db	1
+.433:	ld	e,43h	;disk full
+	db	1
+e_68:	ld	e,44h	;to many files
+	db	1
+e_69:	ld	e,45h	;write protect
+	db	1
+e_70:	ld	e,46h	;disk io
+	db	1
+.502:	ld	e,47h	;disk o
+	ld	bc,0
+	xor	a
+	ld	(0F87Ch),a
+	ld	(0FCAEh),a
+	push	de
+	ld	ix,6B24h
+	call	BasicCall
+	pop	de
+	ld	ix,406Fh
+	jp	BasicCall
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Error printer
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hERRP:	ei
+	ld	a,e
+	sub	3Ch
+	ret	c
+	cp	0Ch
+	ret	nc
+	inc	a
+	ld	b,a
+	ld	hl,$x_err
+.528:	ld	a,(hl)
+	and	a
+	inc	hl
+	jr	nz,.528
+	djnz	.528
+	dec	hl
+	ld	de,0F604h
+	push	de
+	ld	bc,16h
+	ldir
+	ld	e,1
+	pop	hl
+	ret
+;
+$x_err:	db	0
+$e_bf:	db	'Bad FAT',0
+$e_bfm:	db	'Bad file mode',0
+$e_bdn:	db	'Bad drive name',0
+$e_bsn:	db	'Bad sector number',0
+$e_fso:	db	'File still open',0
+$e_exi:	db	'File already exists',0
+$e_df:	db	'Disk full',0
+$e_2mf:	db	'Too many files',0
+$e_dwp:	db	'Disk write protected',0
+$e_dio:	db	'Disk I/O error',0
+$e_ofl:	db	'Disk offline',0
+$e_rad:	db	'Rename across disk',0
+;
+;
+pBasEH:
+	dw	BasicErrHandler
+BasicErrHandler:
+	bit	7,c
+	jp	nz,.548
+	res	0,c
+	ld	b,0
+	ld	hl,Tab2er
+	add	hl,bc
+.539:	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	jp	(hl)
+;
+Tab2er:	dw	e_68
+	dw	e_70
+	dw	e_69
+	dw	e_69
+	dw	e_69
+	dw	e_69
+	dw	e_69
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	BASIC text parsers
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SYNCHR:	call	CHRGTR
+	ex	(sp),hl
+	cp	(hl)
+	jr	nz,.427
+	inc	hl
+	ex	(sp),hl
+	inc	hl
+CHRGTR:	dec	hl
+BASCHR:	ld	ix,4666h
+	jr	BasicCall
+;
+ResRuHook:
+	ld	a,0C9h
+	ld	(0FED5h),a
+	ld	de,(0FC4Ah)
+	ld	(0F349h),de
+	ret
+;
+T72A8:	rst	30h
+	nop
+	dw	ResRuHook
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	More error generators
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+.368:	ld	e,10h
+	db	1
+.476:	ld	e,0Dh
+	db	1
+.450:	ld	e,7
+	db	1
+.475:	ld	e,3Bh
+	db	1
+T72B9:	ld	e,37h
+	db	1
+.477:	ld	e,32h
+	db	1
+.428:	ld	e,36h
+	db	1
+.430:	ld	e,34h
+	db	1
+.512:	ld	e,38h
+	db	1
+.432:	ld	e,35h
+	db	1
+.521:	ld	e,5
+	db	1
+.427:	ld	e,2
+	ld	ix,406Fh
+BasicCall:
+	call	0159h
+	ei
+	ret
+
+hParDev:
+	ei
+	push	hl
+	push	de
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,10h
+	jr	nc,.549
+	ld	l,18h
+.549:
+	add	hl,sp
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	push	hl
+	ld	hl,6E95h
+	rst	20h
+	pop	hl
+	jr	z,.550
+	push	hl
+	ld	hl,6EC9h
+	rst	20h
+	pop	hl
+	jr	nz,.551
+	ld	de,0F377h
+	jr	.552
+.550:
+	ld	de,0F37Ah
+.552:
+	ld	(hl),d
+	dec	hl
+	ld	(hl),e
+.551:
+	pop	de
+	pop	hl
+	ld	a,e
+	cp	2
+	ret	c
+	ld	a,(hl)
+	cp	':'
+	jr	z,.512
+	inc	hl
+	ld	a,(hl)
+	cp	':'
+	dec	hl
+	ret	nz
+	call	RetModify
+	ld	a,(hl)
+	and	0DFh
+	sub	'@'
+	push	hl
+	ld	hl,0F347h
+	cp	(hl)
+	pop	hl
+	jr	z,.553
+	jp	nc,e$badd
+.553:
+	inc	hl
+	inc	hl
+	dec	e
+	dec	e
+	push	de
+	inc	e
+	pop	de
+	ret
+
+
+hNoDevName:
+	ei
+	ld	a,0
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Avoid 'Illegal function call'
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+RetModify:
+	ei
+	push	hl
+	push	af
+	ld	a,(0F348h)
+	add	a,a
+	ld	hl,0Ch
+	jr	nc,.554
+	ld	l,14h
+.554:	add	hl,sp
+	ld	(hl),8Bh
+	inc	hl
+	ld	(hl),0F3h
+	pop	af
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Transferred to upper memory
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DiskHiRes:
+	call	0F36Bh
+	ld	a,(de)
+	call	0F368h
+	inc	de
+	cp	'$'
+	ret	z
+	call	Char2CON
+	jr	DiskHiRes
+	call	0F36Bh
+	ldir
+	call	0F368h
+	ret
+	call	0F36Bh
+	jp	0
+	ld	de,0F1DEh
+	push	de
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	ex	de,hl
+	call	0F36Bh
+	jp	(hl)
+	jp	ConvertFCB
+	db	'PRN LST NUL AUX CON            ',80h,0,0,0,0,0,0,0,0,0,0,0
+	db	0,0,0,0,0,0,0,0,0,1Fh,1Ch,1Fh,1Eh,1Fh,1Eh,1Fh,1Fh,1Eh,1Fh,1Eh
+	db	1Fh
+
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;››                                                                        ››
+;››             Multi-FAT swapper                                          ››
+;››             (C) 1992, SOLID                                            ››
+;››                                                                        ››
+;››                                                                        ››
+;››                                                                        ››
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+
+FAT_read:
+	ld	a,h
+	or	l
+	jp	nz,GETFAT
+	ld	hl,(0FD09h)
+	ret
+
+NewGetFAT:
+	call	0F252h
+	call	FAT_Swapper
+	jp	OldGetFAT
+
+FAT_write:
+	ld	a,h
+	or	l
+	jr	nz,NewPutFAT
+	ld	(0FD09h),bc
+	ret
+
+NewPutFAT:
+	call	FAT_Swapper
+	dec	de
+	ld	a,1
+	ld	(de),a
+	inc	de
+	jp	PutFAT
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+FAT_Swapper:
+	push	hl
+	ld	hl,(0FFDBh)	;Is this FAT in common buffer
+	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	or	a
+	sbc	hl,de
+	pop	hl
+	ret	nz		;No -> do no swapping
+	ld	a,(0FFD9h)	;Is current's drive FAT buffered?
+	cp	(ix)
+	jr	z,.569
+	call	SWAFAT		;if no -> swap immediately
+	jr	.570
+;
+.569:	ld	a,h		;get FAT block # we need
+	rra
+	rra
+	and	3
+	push	hl
+	ld	hl,0FFDAh
+	cp	(hl)
+	pop	hl		;compare to block # in buffer
+	call	nz,SWAFAT	;If no match -> swap FATS
+.570:	ld	a,h
+	and	3
+	ld	h,a		;mask FAT entry addres to block size
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Swapping FAT buffers
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SWAFAT:	push	hl
+	call	SaveFATbuf
+	pop	hl
+ReadFATbuf:
+	ld	a,(ix)
+	ld	(0FFD9h),a	;FAT's drive
+	ld	a,h
+	rra
+	rra
+	and	3
+	ld	(0FFDAh),a	;FAT's block no
+	push	hl
+	push	de
+	push	bc
+	call	GetFATbuf
+	ld	b,a
+	ld	a,(0FFDAh)
+	ld	c,a
+	add	a,a
+	add	a,c
+	add	a,e
+	ld	e,a
+	jr	nc,.571
+	inc	d
+.571:	push	hl
+	push	de
+	push	bc
+	ld	b,3
+	call	DiskReadSect
+	pop	bc
+	pop	de
+	pop	hl
+	jr	nc,.572
+	ld	a,(ix+10h)
+	add	a,e
+	ld	e,a
+	jr	nc,.573
+	inc	d
+.573:	djnz	.571
+	call	GetFATbuf
+	ld	b,3
+	call	DOS_abs_read
+.572:	pop	bc
+	pop	de
+	pop	hl
+	ret
+;
+DiskReadSect:
+	call	0F270h
+	ld	a,(ix)
+	ld	c,(ix+1)
+	jp	ReadSector_all
+;
+NewUpdateFAT:
+	push	de
+	ld	e,(ix+13h)
+	ld	d,(ix+14h)
+	ld	hl,(0FFDBh)
+	or	a
+	sbc	hl,de
+	pop	de
+	jp	nz,.574
+SaveFATbuf:
+	push	bc
+	push	de
+	push	ix
+	ld	a,(0FFD9h)
+	call	GetDPBptr
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
+	push	bc
+	pop	ix
+	call	GetFATbuf
+	ld	b,a
+	dec	hl
+	ld	a,(hl)
+	ld	(hl),0
+	inc	hl
+	cp	1
+	jp	nz,.575
+	ld	a,(0FFDAh)
+	ld	c,a
+	add	a,a
+	add	a,c
+	add	a,e
+	ld	e,a
+	jr	nc,.576
+	inc	d
+.576:	push	de
+	push	bc
+	push	hl
+	ld	a,(0FFDAh)
+	ld	b,a
+	add	a,a
+	add	a,b
+	ld	b,a
+	ld	a,(ix+10h)
+	sub	b
+	jr	z,.575
+	cp	3
+	ld	b,a
+	jr	c,.577
+	ld	b,3
+.577:	ld	a,(ix)
+	call	DOS_Abs_write
+	pop	hl
+	pop	bc
+	pop	de
+	ld	a,e
+	add	a,(ix+10h)
+	ld	e,a
+	jr	nc,.578
+	inc	d
+.578:	djnz	.576
+.575:	pop	ix
+	pop	de
+	pop	bc
+	ret
+;
+.574:	call	GetFATbuf
+.579:	push	af
+	push	ix
+	push	hl
+	push	de
+	push	bc
+	ld	a,(ix)
+	ld	c,(ix+1)
+	call	DOS_Abs_write
+	pop	bc
+	pop	de
+	ld	a,e
+	add	a,b
+	ld	e,a
+	ld	a,0
+	adc	a,d
+	ld	d,a
+	pop	hl
+	pop	ix
+	pop	af
+	dec	a
+	jr	nz,.579
+	ret
+;
+.61:	ld	a,(0FFD9h)
+	cp	(ix)
+	call	nz,SaveFATbuf
+	ld	a,(0F2E1h)
+	call	ReadFATbuf
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	dec	hl
+	ld	(hl),0
+	jp	DPB_change_entry
+
+;›››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;››                                                                         ››
+;››          IDE Hard Disk (lowest level) Read/Write                        ››
+;››                                                                         ››
+;››                                                                         ››
+;›››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+
+HDD_SectorIO:
+	ei
+	push	hl
+	push	de
+	push	bc
+	push	af
+	cp	5
+	jr	nc,.581			;Wrong partition number
+	call	GetWorkBuf
+	pop	af
+	push	af
+	ld	e,a
+	ld	d,0
+	ex	de,hl
+	add	hl,hl
+	add	hl,hl
+	add	hl,de
+	push	hl
+	pop	ix
+	ld	a,(ix)			;Test if partition exist (must have
+	or	(ix+1)			;nonzero start cylinder)
+	jp	z,.581
+	pop	af
+	pop	bc
+	pop	de
+	pop	hl
+.582:	call	Wait_HDD
+	push	bc
+	push	de
+	push	af
+	call	SectorTrans
+	pop	af
+	push	af
+	call	XFER_HDD
+	pop	af
+	pop	de
+	inc	de
+	pop	bc
+	djnz	.582
+	xor	a
+	ret
+;
+.581:	pop	bc
+	ld	a,4
+	scf
+	pop	bc
+	pop	de
+	pop	hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Logical sector -> physical
+;	CHS addressing used.
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SectorTrans:
+	ex	de,hl
+	ld	a,(0FD0Bh)
+	ld	c,a
+	xor	a
+	ld	b,10h
+.584:	add	hl,hl
+	rla
+	cp	c
+	jr	c,.583
+	sub	c
+	inc	l
+.583:	djnz	.584
+	inc	a
+	push	de
+	ld	e,(ix)
+	ld	d,(ix+1)
+	add	hl,de
+	ex	de,hl
+	pop	hl
+SetHDDParam:
+	ex	af,af'
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C2h
+	out	(32h),a
+	ld	a,1
+	out	(30h),a
+	ld	a,82h
+	out	(32h),a
+	ld	a,0C2h
+	out	(32h),a
+	inc	a
+	out	(32h),a
+	ex	af,af'
+	out	(30h),a
+	ld	a,83h
+	out	(32h),a
+	ld	a,0C3h
+	out	(32h),a
+	ld	a,0C6h
+	out	(32h),a
+	call	calc_HeadCyl
+	or	0A0h
+	out	(30h),a
+	ld	a,86h
+	out	(32h),a
+	ld	a,0C6h
+	out	(32h),a
+	ld	a,0C4h
+	out	(32h),a
+	ld	a,e
+	out	(30h),a
+	ld	a,84h
+	out	(32h),a
+	ld	a,0C4h
+	out	(32h),a
+	inc	a
+	out	(32h),a
+	ld	a,d
+	out	(30h),a
+	ld	a,85h
+	out	(32h),a
+	ld	a,0C5h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	HDD data transfer <=>
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+XFER_HDD:
+	jp	c,hdd_wrsec
+hdd_rdsec:
+	ld	a,21h
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,92h
+	out	(33h),a
+.587:	ld	a,0C7h
+	out	(32h),a
+	ld	a,47h
+	out	(32h),a
+	in	a,(30h)
+	bit	7,a
+	jr	nz,.587
+	bit	0,a
+	jp	nz,.586
+	bit	3,a
+	jr	z,.587
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,0C0h
+	out	(32h),a
+	bit	7,h
+	push	af
+	push	hl
+	jr	nz,.588
+	ld	hl,(0F34Dh)
+.588:	ld	c,30h
+	ld	d,0
+.589:	ld	a,40h
+	out	(32h),a
+	ini
+	inc	c
+	ini
+	dec	c
+	ld	a,0C0h
+	out	(32h),a
+	dec	d
+	jr	nz,.589
+	pop	de
+	pop	af
+	ret	nz
+	ld	hl,(0F34Dh)
+	ld	bc,0200h
+	call	0F1D9h
+	ex	de,hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Write sector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+hdd_wrsec:
+	ld	a,31h
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	b,30h
+.590:	ex	(sp),hl
+	ex	(sp),hl
+	djnz	.590
+	ld	a,0C0h
+	out	(32h),a
+	push	hl
+	bit	7,h
+	jr	nz,.591
+	ld	de,(0F34Dh)
+	ld	bc,0200h
+	call	0F1D9h
+	ld	hl,(0F34Dh)
+.591:	ld	c,30h
+	ld	d,0
+.592:	outi
+	inc	c
+	outi
+	dec	c
+	ld	a,80h
+	out	(32h),a
+	ld	a,0C0h
+	out	(32h),a
+	dec	d
+	jr	nz,.592
+	pop	hl
+	inc	h
+	inc	h
+	ret
+;
+.586:	pop	bc		;HDD I/O error recovery
+	pop	bc
+	pop	de
+	pop	bc
+	ld	a,0C1h
+	out	(32h),a
+	ld	a,'A'
+	out	(32h),a
+	in	a,(30h)
+	ld	c,a
+	ld	a,0C1h
+	out	(32h),a
+	ld	a,8
+	rr	c
+	ret	c
+	rr	c
+	ret	c
+	ld	a,0Ch
+	rr	c
+	ret	c
+	rr	c
+	ld	a,8
+	rr	c
+	ret	c
+	rr	c
+	ld	a,4
+	rr	c
+	ret	c
+	ld	a,2
+	scf
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Head/cylinder calculation
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+calc_HeadCyl:
+	ex	de,hl
+	ld	a,(0FD0Ch)
+	ld	c,a
+	xor	a
+	ld	b,10h
+.594:	add	hl,hl
+	rla
+	cp	c
+	jr	c,.593
+	sub	c
+	inc	l
+.593:	djnz	.594
+	ex	de,hl
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Set DPB using sector 0
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_SetBPB:
+	ei
+	push	hl
+	ld	de,0
+	ld	hl,(0F34Dh)
+	ld	b,1
+	or	a
+	call	HDD_SectorIO
+	pop	iy
+	ret	c
+	ld	ix,(0F34Dh)
+	ld	a,(ix+15h)
+	ld	(iy+1),a
+	ld	l,(ix+0Bh)
+	ld	(iy+2),l
+	ld	h,(ix+0Ch)
+	ld	(iy+3),h
+	add	hl,hl
+	add	hl,hl
+	add	hl,hl
+	dec	h
+	ld	(iy+4),h
+	ld	a,0FFh
+.595:	inc	a
+	srl	h
+	jr	c,.595
+	ld	(iy+5),a
+	ld	a,(ix+0Dh)
+	dec	a
+	ld	(iy+6),a
+	ld	c,0
+.596:	inc	c
+	rra
+	jr	c,.596
+	ld	(iy+7),c
+	ld	l,(ix+1Ch)
+	ld	h,(ix+1Dh)
+	inc	hl
+	ld	(iy+8),l
+	ld	(iy+9),h
+	ld	e,(ix+16h)
+	ld	(iy+10h),e
+	ld	d,0
+	ld	b,(ix+10h)
+	ld	(iy+0Ah),b
+.597:	add	hl,de
+	djnz	.597
+	ld	(iy+11h),l
+	ld	(iy+12h),h
+	ld	a,(ix+11h)
+	ld	(iy+0Bh),a
+	dec	a
+	ld	c,(iy+4)
+	inc	c
+.598:	inc	hl
+	sub	c
+	jr	nc,.598
+	ld	(iy+0Ch),l
+	ld	(iy+0Dh),h
+	ex	de,hl
+	ld	l,(ix+13h)
+	ld	h,(ix+14h)
+	or	a
+	sbc	hl,de
+	ld	a,(iy+7)
+.600:	dec	a
+	jr	z,.599
+	srl	h
+	rr	l
+	jr	.600
+.599:	inc	hl
+	ld	(iy+0Eh),l
+	ld	(iy+0Fh),h
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Choice for FORMAT - no choice
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_Choice:
+	xor	a
+	ld	l,a
+	ld	h,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Disk change - NO CHANGE
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_DiskChg:
+	push	af
+	call	GetWorkBuf
+	pop	af
+	cp	(ix+14h)
+	ld	(ix+14h),a
+	jr	nz,.601
+	ld	b,1
+	xor	a
+	ret
+;
+.601:	ld	b,0FFh
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+; format removed for ROM space freeing
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_Format:
+	call	PrintMsg
+	db	0Dh,'Use HDPREP utility to format,',0Dh,0Ah
+	db	'and test your HDD.',0,0C9h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Initialize Hard Disk
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_StopMotor:
+	di
+	ld	hl,0
+	ld	a,92h
+	out	(33h),a
+.610:	ld	a,0C7h
+	out	(32h),a
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ld	a,47h
+	out	(32h),a
+	in	a,(30h)
+.602:	or	a
+	jp	p,.609
+	dec	hl
+	ld	a,h
+	or	l
+	jp	nz,.610
+	scf
+	ei
+	ret
+;
+.609:	ld	a,0C7h
+	out	(32h),a
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,11h		;Recalibrate
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	ex	(sp),hl
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get HDD's sectors & heads
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+InitFileSystem:
+	ld	hl,2000h
+ifs00:	dec	hl		;slight delay added...
+	ld	a,h
+	or	l
+	jr	nz,ifs00
+        call	HDD_StopMotor
+	ret	c
+;
+	call	IDE_Inf1
+	ld	b,3
+ifs4:	ld	a,40h
+	out	(32h),a
+	ld	a,0F0h
+	out	(32h),a	;9000
+	djnz	ifs4
+	ld	a,40h
+	out	(32h),a
+	in	a,(30h)
+	ld	(0FD0Ch),a
+	ld	a,0F0h
+	out	(32h),a	;9006
+	ld	a,40h
+	out	(32h),a
+	ld	a,0F0h
+	out	(32h),a	;9008
+	ld	a,40h
+	out	(32h),a
+	ld	a,0F0h
+	out	(32h),a	;900A
+	ld	a,40h
+	out	(32h),a
+	in	a,(30h)
+	ld	(0FD0Bh),a
+	ld	a,0F0h
+	out	(32h),a	;900C
+	ld	b,255
+ifs5:	ld	a,40h
+	out	(32h),a
+	ld	a,0F0h
+	out	(32h),a
+	djnz	ifs5
+;
+	call	OutputHDDLogo
+	ld	b,6
+ifs1:	ld	hl,0
+ifs2:	dec	hl
+	ld	a,h
+	or	l
+	jr	nz,ifs2
+	djnz	ifs1
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Wait for HDD ready
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+Wait_HDD:
+	push	af
+	ld	a,92h
+	out	(33h),a
+.611:	ld	a,0C7h
+	out	(32h),a
+	ld	a,47h
+	out	(32h),a
+	in	a,(30h)
+	and	11010000b
+	cp	50h
+	jp	nz,.611		;loop if BUSY flag set
+	ld	a,0F7h
+	out	(32h),a
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get maximal disk count
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+GetHardDiskCount:
+	ld	l,5
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Read MASTER BOOT (0/0/1)
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+ReadMBR:push	bc
+	push	de
+	ld	de,0
+	ld	c,0
+	ld	a,1
+	push	hl
+	call	HDD_Abs_Read
+	pop	hl
+	pop	de
+	pop	bc
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Hard Disk MASTER BOOT
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+MasterBoot:
+	ld	hl,9000h
+	call	ReadMBR
+	ret	c
+	call	9000h
+	ret	c
+	call	GetWorkBuf
+	ex	de,hl
+	ld	hl,9100h
+	ld	bc,0500h
+.613:	push	bc
+	ldi
+	ldi
+	ex	de,hl
+	ld	(hl),0
+	inc	hl
+	ld	(hl),0
+	inc	hl
+	ex	de,hl
+	ld	a,(hl)
+	ld	bc,0Eh
+	add	hl,bc
+	pop	bc
+	or	a
+	jr	z,.612
+	ld	a,5
+	sub	b
+	ld	c,a
+.612:	djnz	.613
+	ex	de,hl
+	ld	(hl),0FFh
+	push	hl
+	push	bc
+	call	GetMySlot
+	ld	hl,0FB21h
+	ld	b,a
+	ld	c,0
+.614:	ld	a,(hl)
+	add	a,c
+	ld	c,a
+	inc	hl
+	ld	a,(hl)
+	inc	hl
+	cp	b
+	jr	nz,.614
+	dec	hl
+	dec	hl
+	ld	a,c
+	sub	(hl)
+	pop	bc
+	add	a,c
+	pop	hl
+	inc	hl
+	ld	(hl),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Boot MSX-DOS from HDD
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DOS_HDD_BOOT:
+	di
+	in	a,(0AAh)
+	and	0F0h
+	or	7
+	out	(0AAh),a
+	nop
+	in	a,(0A9h)
+	and	40h		;If [SELECT] do not boot 
+	scf
+	ret	z
+	call	GetWorkBuf
+	ld	a,(ix+15h)
+	and	7
+	ld	(0F247h),a
+	ld	bc,01F8h
+	ld	hl,(0F351h)
+	ld	de,0
+	or	a
+	call	0144h
+	ld	hl,(0F351h)
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Default DPB pattern
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+DEFAULT_DPB:
+	db	0F9h
+	dw	0200h
+	db	0Fh,04h,03h,03h,01h,00h,02h,70h
+	dw	0Eh
+	dw	02CAh
+	db	03h
+	dw	7
+	db	0D0h,02h
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	_PARK for BASIC
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+call_park:
+	push	hl
+	ld	hl,(0F34Dh)
+	call	IDE_Info
+	jr	c,.616
+	ld	hl,(0F34Dh)
+	ld	de,2
+	add	hl,de
+	ld	a,(hl)
+	inc	hl
+	ld	h,(hl)
+	ld	l,a
+	call	HDD_seek
+	call	PrintMsg
+	db	0Dh,0Ah,'Heads parked successfully',13,10,0
+	pop	hl
+	or	a
+	ret
+;
+.616:	call	PrintMsg
+	db	0Dh,0Ah,'Identify command rejected',13,10,0
+	pop	hl
+	or	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Get IDE device capabilities
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+IDE_Info:
+	call	Wait_HDD
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,0ECh
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,92h
+	out	(33h),a
+	ld	a,0C7h
+	out	(32h),a
+.621:	ld	a,47h
+	out	(32h),a
+	in	a,(30h)
+	ld	c,a
+	ld	a,0C7h
+	out	(32h),a
+	bit	7,c
+	jr	nz,.621		;wait if BUSY bit set
+	bit	0,c
+	jr	z,erexpl	;explain error
+	bit	3,c		;DTRQ set? if no -> loop
+	jr	z,.621
+	ld	c,30h
+	ld	d,0
+.622:	ld	a,40h
+	out	(32h),a
+	ini
+	inc	c
+	ini
+	dec	c
+	ld	a,0F0h
+	out	(32h),a
+	dec	d
+	jr	nz,.622
+	xor	a
+	ret
+;
+erexpl:	ld	a,0C1h
+	out	(032h),a
+	ld	a,041h
+	out	(032h),a
+	in	a,(030h)
+	ld	c,a
+	ld	a,0C1h
+	out	(032h),a
+	ld	a,c
+	scf
+	ret
+
+IDE_Inf1:
+	call	Wait_HDD
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,0ECh
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,92h
+	out	(33h),a
+	ld	a,0C7h
+	out	(32h),a
+.621a:	ld	a,47h
+	out	(32h),a
+	in	a,(30h)
+	ld	c,a
+	ld	a,0C7h
+	out	(32h),a
+	bit	7,c
+	jr	nz,.621a	;wait if BUSY bit set
+	bit	0,c
+	jr	z,erexpl	;explain error
+	bit	3,c		;DTRQ set? if no -> loop
+	jr	z,.621
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Seek to track
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_seek:
+	call	Wait_HDD
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C4h
+	out	(32h),a
+	ld	a,l
+	out	(30h),a
+	ld	a,84h
+	out	(32h),a
+	ld	a,0C4h
+	out	(32h),a
+	inc	a
+	out	(32h),a
+	ld	a,h
+.620:	out	(30h),a
+	ld	a,85h
+	out	(32h),a
+	ld	a,0C5h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ld	a,71h
+	out	(30h),a
+	ld	a,87h
+	out	(32h),a
+.624:	ld	a,0C7h
+	out	(32h),a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Hard disk logo output
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+OutputHDDLogo:
+	di
+	push	af
+	push	hl
+	ld	hl,$_logo
+	call	sputc
+	ld	a,(0FD0Ch)
+	call	MakeDec
+	ld	hl,$logo2
+	call	sputc
+	ld	a,(0FD0Bh)
+	call	MakeDec
+	pop	hl
+	pop	af
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	create decimal
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+MakeDec:
+	ld	c,a
+	ld	b,8
+	xor	a
+.623:	rl	c
+	adc	a,a
+	daa
+	djnz	.623
+	push	af
+	rrca
+	rrca
+	rrca
+	rrca
+	call	S79DC
+	pop	af
+S79DC:	and	0Fh
+	add	a,'0'
+	call	0A2h
+	ret
+;
+sputc:	ld	a,(hl)
+	or	a
+	ret	z
+	call	0A2h
+	inc	hl
+	jr	sputc
+;
+$_logo:	db	12,'BEER 203: IDE HDD driver',13,10
+	db	'version 1.8 (c) SOLID, 1995',13,10
+	db	'HDD connected ok;',13,10
+	db	'Heads: ',0
+$logo2:	db	13,10,'Sectors/track: ',0
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Illegal XBIOS call
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+BadBIOSfun:
+	scf
+	sbc	a,a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Read absolute 1 sector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_Abs_Read:
+	push	hl
+	push	bc
+	push	de
+	push	af
+	call	Wait_HDD
+	pop	af
+	pop	de
+	pop	bc
+	call	SetAbsoluteParm
+	pop	hl
+	call	hdd_rdsec
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Write absolute 1 sector
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+HDD_Abs_write:
+	push	hl
+	push	bc
+	push	de
+	push	af
+	call	Wait_HDD
+	pop	af
+	pop	de
+	pop	bc
+	call	SetAbsoluteParm
+	pop	hl
+	call	hdd_wrsec
+	xor	a
+	ret
+
+;ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ
+;	Set register file absolute
+;œœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœœ
+
+SetAbsoluteParm:
+	ex	af,af'
+	ld	a,80h
+	out	(33h),a
+	ld	a,0C2h
+	out	(32h),a
+	ld	a,1		;1 sector to transfer
+	out	(30h),a
+	ld	a,82h
+	out	(32h),a
+	ld	a,0C2h
+	out	(32h),a
+	inc	a
+	out	(32h),a
+	ex	af,af'
+	out	(30h),a		;Number of sector on track
+	ld	a,83h
+	out	(32h),a
+	ld	a,0C3h
+	out	(32h),a
+	ld	a,0C6h
+	out	(32h),a
+	ld	a,c
+	and	00Fh
+	or	0A0h
+	out	(30h),a		;head number
+	ld	a,86h
+	out	(32h),a
+	ld	a,0C6h
+	out	(32h),a
+	ld	a,0C4h
+	out	(32h),a
+	ld	a,e		;cylinder low
+	out	(30h),a
+	ld	a,84h
+	out	(32h),a
+	ld	a,0C4h
+	out	(32h),a
+	inc	a
+	out	(32h),a
+	ld	a,d		;cylinder hi
+	out	(30h),a
+	ld	a,85h
+	out	(32h),a
+	ld	a,0C5h
+	out	(32h),a
+	ld	a,0C7h
+	out	(32h),a
+	ret
+
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+
+	ds	7F80h - $
+
+;››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+
+	db	'SOLIDSOFT XBIOS '	;locates @ 7F80h
+					;must NOT change since is used for
+					;HDD ROM search/identification.
+	jp	XBIOS_ver
+	jp	BadBIOSfun
+	jp	IDE_Info
+	jp	BadBIOSfun
+	jp	HDD_seek
+	jp	HDD_Abs_Read
+	jp	HDD_Abs_write
+	jp	0
+	jp	0
+	jp	0
+	jp	0
+	jp	0
+	jp	0
+XBIOS_ver:
+	ld	hl,0180h
+	xor	a
+	ret
+;
+;›››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››››
+;
+	END
+
