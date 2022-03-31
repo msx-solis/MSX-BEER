@@ -1,5 +1,5 @@
 # MSX-BEER
-New design files for this MSX HD cartridge
+New design files for this MSX HD cartridge.
 MSXmakers version 1.1 on "beer_ide_kicad" and "gerber" folders.
 
 
