@@ -32,6 +32,6 @@ some files:
 
 https://msx.org/forum/msx-talk/hardware/beer-ide-bios-19rc1-source-code-wanted?page=1
 
-version SD discussion and some more files:
+Discussion about the version SD and some more files:
 
 http://www.nedopc.org/forum/viewtopic.php?f=96&t=18820&sid=d75385e94fd1d6dbab35a1f73d379176&start=45#p144050
