@@ -1,5 +1,7 @@
 # MSX-BEER
-design files for this MSX HD cartridge
+New design files for this MSX HD cartridge
+MSXmakers version on:
+
 
 
 Links for ide-beer202
