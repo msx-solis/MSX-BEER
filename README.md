@@ -30,7 +30,7 @@ https://www.msx.org/forum/msx-talk/hardware/beer-202-ide-interface?page=2
 
 http://www.retrocomputacion.com/forum/hardware_msx/4440/experimentos-con-la-beer-interface-ide-para-msx-1-y-2/&p=2
 
-some files:
+Some files:
 
 https://msx.org/forum/msx-talk/hardware/beer-ide-bios-19rc1-source-code-wanted?page=1
 
