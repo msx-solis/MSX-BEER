@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "beer_ide_kicad-rescue")(type "Legacy")(uri "${KIPRJMOD}/beer_ide_kicad-rescue.lib")(options "")(descr ""))
+)
