@@ -12,7 +12,9 @@ Here you have very good instructions (in portuguesse). Talk about the problems w
 
 http://basshp.blogspot.com/2014/04/beer-202-ata-ide-review.html
 
-Here you have lots of details
+Here you have a demostration video for this distribution: https://www.youtube.com/watch?v=AeNEiQcKNEI&t=1s
+
+And here you have lots of BEER interface details
 
 https://www.pjrc.com/tech/8051/ide/wesley.html
 
@@ -45,4 +47,6 @@ http://www.hddguru.com/
 Another system menu for game loading.
 
 https://www.msxall.com/download/msxmenu-v1.68-beer.zip
+
+And here you have a demostration video for this ditribution: https://www.youtube.com/watch?v=a2agPfgZmI0&t=596s
 
