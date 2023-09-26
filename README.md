@@ -36,6 +36,8 @@ Some files:
 
 https://msx.org/forum/msx-talk/hardware/beer-ide-bios-19rc1-source-code-wanted?page=1
 
+https://sysadminmosaic.ru/en/msx/beer_ide/beer_ide
+
 Discussion about the version SD and some more files:
 
 http://www.nedopc.org/forum/viewtopic.php?f=96&t=18820&sid=d75385e94fd1d6dbab35a1f73d379176&start=45#p144050
@@ -49,4 +51,6 @@ Another system menu for game loading.
 https://www.msxall.com/download/msxmenu-v1.68-beer.zip
 
 And here you have a demostration video for this ditribution: https://www.youtube.com/watch?v=a2agPfgZmI0&t=596s
+
+
 
