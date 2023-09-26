@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# Script to compile an UZIX application under Linux using cpmemu emulator
+# (c) 2001 A&L Software
+#
+# This program is under GPL License.
+#
+# cpmemu can be found at: http://cpmemu.sourceforge.net
+#
+
+# Define here the path where cpmemu executable is installed
+CPMPATH=/usr/local/bin
+
+#########################################################################
+
+DOOPT=1
+LIB=$2 $3 $4 $5 $6 $7 $8 $9
+
+if [ ! -e $CPMPATH/cpm ]; then
+	echo CP/M-emulator not found. Please, edit the CPMPATH variable in this script
+	echo to point to the right path of cpmemu.
+	echo CPMPATH actual content is: $CPMPATH
+	exit
+fi
+
+if [ "$1" = "" ]; then
+	echo usage: ucc sourcefile [-o] [library1] [library2...]
+	echo "       source filename must be supplied without extension."
+	echo "       option -o disables code optimization."
+	echo "       library1, library2, etc are other libraries to link"
+	exit
+fi
+
+if [ ! -e $1.c ]; then
+	echo Source file does not exist.
+	exit
+fi
+
+if [ "$2" = "-o" ]; then
+	DOOPT=0
+	LIB=$3 $4 $5 $6 $7 $8 $9	
+fi
+
+echo
+echo Compiling $1.c for UZIX
+echo
+echo Preprocessing...
+$CPMPATH/cpm -f -x cpp -DMSX_UZIX_TARGET -DHI_TECH_C -Dz80 -I $1.c C1.T
+echo Pass 1...
+$CPMPATH/cpm -f -x p1 C1.T C2.T C3.T
+echo Generating C code...
+$CPMPATH/cpm -f -x cgen C2.T C1.T
+if [ DOOPT = 1 ]; then
+	echo Optimizing...
+        $CPMPATH/cpm -f -x optim C1.T C2.T
+        echo Generating assembly code...
+        $CPMPATH/cpm -f -x zas -J -N -o$1.O C2.T
+else
+        echo Generating assembly code...
+        $CPMPATH/cpm -f -x zas -N -o$1.O C1.T
+fi
+rm -f c1.t c2.t c3.t
+echo Linking...
+$CPMPATH/cpm -f -x link -Z -M\$\$.m -Ptext=0,data,bss -C100H -O$1 C0U.O $1.O $LIB LIBC.LIB
+mv \$\$.m $1.map
+rm -f $1.o
+echo Done.
+echo
